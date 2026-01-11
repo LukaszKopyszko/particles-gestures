@@ -45,7 +45,8 @@ export const HUD: React.FC = () => {
         pointing: { icon: '☝️', label: 'Pointing' },
         peace: { icon: '✌️', label: 'Peace' },
         middle: { icon: '🖕', label: 'Middle' },
-        thumbsup: { icon: '👍', label: 'Thumbs Up' }
+        thumbsup: { icon: '👍', label: 'Thumbs Up' },
+        ok: { icon: '👌', label: 'Perfect' }
     };
 
     const current = gestureInfo[gesture] || gestureInfo.none;
@@ -150,6 +151,7 @@ export const HUD: React.FC = () => {
                     { key: 'pointing', icon: '☝️', label: 'Attract' },
                     { key: 'peace', icon: '✌️', label: 'Spread' },
                     { key: 'thumbsup', icon: '👍', label: 'Nice!' },
+                    { key: 'ok', icon: '👌', label: 'Perfect' },
                     { key: 'middle', icon: '🖕', label: 'Boom!' },
                 ].map((item) => (
                     <div key={item.key} style={{

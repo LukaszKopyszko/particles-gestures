@@ -25,6 +25,8 @@ export default function Home() {
     <main style={{
       width: '100vw',
       height: '100vh',
+      // @ts-expect-error dvh is valid CSS
+      height: '100dvh',
       background: '#000',
       overflow: 'hidden',
       position: 'fixed',

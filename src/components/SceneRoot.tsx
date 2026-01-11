@@ -150,6 +150,8 @@ export default function SceneRoot() {
             left: 0,
             width: '100vw',
             height: '100vh',
+            // @ts-expect-error dvh is valid CSS
+            height: '100dvh',
             background: '#050510',
             overflow: 'hidden'
         }}>

@@ -5,7 +5,8 @@ export enum GestureType {
     POINTING = 'pointing',
     PEACE = 'peace',
     MIDDLE = 'middle',
-    THUMBSUP = 'thumbsup'
+    THUMBSUP = 'thumbsup',
+    OK = 'ok'
 }
 
 export interface GestureResult {
@@ -17,62 +18,58 @@ export interface GestureResult {
 export class GestureClassifier {
     private currentGesture: GestureType = GestureType.NONE;
     private stableFrames = 0;
-    private readonly DEBOUNCE = 5;
+    private readonly DEBOUNCE = 3; // Reduced debounce for snappier response
 
     process(landmarks: any[]): GestureResult {
         if (!landmarks || landmarks.length < 21) {
             return { gesture: GestureType.NONE, confidence: 0, changed: false };
         }
 
-        const fingerStates = this.getFingerStates(landmarks);
-        const thumbState = this.getThumbState(landmarks);
-
-        const { index, middle, ring, pinky } = fingerStates;
-        const allFingersCurled = !index && !middle && !ring && !pinky;
+        const m = this.analyzeHand(landmarks);
 
         let detected = GestureType.NONE;
         let confidence = 0;
 
-        // Thumbs up: thumb clearly extended UPWARD, all fingers curled
-        // Must be very clearly UP (strict threshold)
-        if (thumbState.isUp && thumbState.isStronglyUp && allFingersCurled) {
-            detected = GestureType.THUMBSUP;
+        // --- DETECTION LOGIC (Hierarchy matters!) ---
+
+        // 1. OK SIGN (Pinch index + thumb, others open)
+        if (m.isPinch && m.middle.isOpen && m.ring.isOpen && m.pinky.isOpen) {
+            detected = GestureType.OK;
             confidence = 0.95;
         }
-        // Fist: all fingers curled AND thumb is NOT pointing up
-        else if (allFingersCurled && !thumbState.isUp) {
+        // 2. MIDDLE FINGER (Middle open, others closed)
+        else if (!m.index.isOpen && m.middle.isOpen && !m.ring.isOpen && !m.pinky.isOpen) {
+            detected = GestureType.MIDDLE;
+            confidence = 0.95;
+        }
+        // 3. THUMBS UP (Thumb up, others closed - check orientation!)
+        else if (m.thumb.isUp && m.thumb.isOpen && !m.index.isOpen && !m.middle.isOpen && !m.ring.isOpen && !m.pinky.isOpen) {
+            detected = GestureType.THUMBSUP;
+            confidence = 0.9;
+        }
+        // 4. PEACE (Index + Middle open, others closed)
+        else if (m.index.isOpen && m.middle.isOpen && !m.ring.isOpen && !m.pinky.isOpen) {
+            detected = GestureType.PEACE;
+            confidence = 0.9;
+        }
+        // 5. POINTING (Index open, others closed)
+        else if (m.index.isOpen && !m.middle.isOpen && !m.ring.isOpen && !m.pinky.isOpen) {
+            detected = GestureType.POINTING;
+            confidence = 0.9;
+        }
+        // 6. FIST (All fingers closed, no pinch)
+        else if (!m.index.isOpen && !m.middle.isOpen && !m.ring.isOpen && !m.pinky.isOpen && !m.thumb.isUp) {
             detected = GestureType.FIST;
             confidence = 0.9;
         }
-        // Middle finger: ONLY middle extended
-        else if (!index && middle && !ring && !pinky) {
-            detected = GestureType.MIDDLE;
-            confidence = 0.95;
-        }
-        // Alternative middle detection
-        else if (middle && !index && !ring &&
-            fingerStates.middleScore > fingerStates.indexScore + 0.04 &&
-            fingerStates.middleScore > fingerStates.ringScore + 0.04) {
-            detected = GestureType.MIDDLE;
-            confidence = 0.85;
-        }
-        // Peace: index + middle extended
-        else if (index && middle && !ring && !pinky) {
-            detected = GestureType.PEACE;
-            confidence = 0.85;
-        }
-        // Pointing: only index extended
-        else if (index && !middle && !ring && !pinky) {
-            detected = GestureType.POINTING;
-            confidence = 0.85;
-        }
-        // Open palm: all fingers extended
-        else if (index && middle && ring && pinky) {
+        // 7. OPEN (Most fingers open)
+        else if (m.index.isOpen && m.middle.isOpen && m.ring.isOpen) {
             detected = GestureType.OPEN;
-            confidence = 0.9;
+            confidence = 0.8;
         }
+        // FALLBACK
         else {
-            detected = GestureType.OPEN;
+            detected = GestureType.OPEN; // Default state
             confidence = 0.4;
         }
 
@@ -92,89 +89,64 @@ export class GestureClassifier {
         return { gesture: this.currentGesture, confidence, changed };
     }
 
-    private getThumbState(landmarks: any[]): { isUp: boolean; isStronglyUp: boolean; isOut: boolean } {
-        const wrist = landmarks[0];
-        const thumbTip = landmarks[4];
-        const thumbIp = landmarks[3]; // IP joint
-        const thumbMcp = landmarks[2];
-        const indexMcp = landmarks[5];
+    // --- GEOMETRIC ANALYSIS ---
 
-        // Calculate how much higher the thumb tip is compared to the MCP
-        const thumbVerticalDiff = thumbMcp.y - thumbTip.y; // Positive = tip above MCP
+    private analyzeHand(lm: any[]) {
+        // Helper to calculate Euclidean distance
+        const dist = (a: any, b: any) => Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2));
 
-        // Thumb is extended if tip is far from wrist
-        const thumbLength = Math.sqrt(
-            Math.pow(thumbTip.x - thumbMcp.x, 2) + Math.pow(thumbTip.y - thumbMcp.y, 2)
-        );
+        // Key Points
+        const wrist = lm[0];
+        const thumbTip = lm[4];
+        const thumbIp = lm[3];
+        const thumbMcp = lm[2];
+        const indexTip = lm[8];
+        const indexPip = lm[6];
+        const indexMcp = lm[5];
+        const middleTip = lm[12];
+        const middlePip = lm[10];
+        const middleMcp = lm[9];
+        const ringTip = lm[16];
+        const ringPip = lm[14];
+        const ringMcp = lm[13];
+        const pinkyTip = lm[20];
+        const pinkyPip = lm[18];
+        const pinkyMcp = lm[17];
 
-        // Palm size for normalization
-        const palmSize = Math.sqrt(
-            Math.pow(wrist.x - landmarks[9].x, 2) + Math.pow(wrist.y - landmarks[9].y, 2)
-        );
+        // Palm Scale (distance from wrist to middle finger base)
+        const palmScale = dist(wrist, middleMcp);
 
-        // isUp: thumb tip is clearly above thumb MCP (normalized by palm size)
-        const isUp = thumbVerticalDiff > palmSize * 0.15;
-
-        // isStronglyUp: very clearly pointing up (stricter threshold)
-        const isStronglyUp = thumbVerticalDiff > palmSize * 0.25;
-
-        // isOut: thumb pointing to the side
-        const isOut = Math.abs(thumbTip.x - indexMcp.x) > palmSize * 0.3;
-
-        return { isUp, isStronglyUp, isOut };
-    }
-
-    private getFingerStates(landmarks: any[]): {
-        index: boolean;
-        middle: boolean;
-        ring: boolean;
-        pinky: boolean;
-        indexScore: number;
-        middleScore: number;
-        ringScore: number;
-        pinkyScore: number;
-    } {
-        const wrist = landmarks[0];
-        const middleMcp = landmarks[9];
-
-        const palmSize = Math.sqrt(
-            Math.pow(wrist.x - middleMcp.x, 2) +
-            Math.pow(wrist.y - middleMcp.y, 2)
-        );
-
-        const getExtensionScore = (tipIdx: number, pipIdx: number): number => {
-            const tip = landmarks[tipIdx];
-            const pip = landmarks[pipIdx];
-
-            const tipToWrist = Math.sqrt(
-                Math.pow(tip.x - wrist.x, 2) +
-                Math.pow(tip.y - wrist.y, 2)
-            );
-
-            const pipToWrist = Math.sqrt(
-                Math.pow(pip.x - wrist.x, 2) +
-                Math.pow(pip.y - wrist.y, 2)
-            );
-
-            return tipToWrist - pipToWrist;
+        // 1. Finger Open/Close check based on Tip-to-Wrist vs MCP-to-Wrist distance
+        // This is robust against rotation (unlike Y-checking)
+        const isFingerOpen = (tip: any, pip: any, mcp: any) => {
+            const tipDist = dist(tip, wrist);
+            const pipDist = dist(pip, wrist);
+            // Finger is "open" if tip is significantly further from wrist than the PIP joint
+            return tipDist > pipDist * 1.1;
         };
 
-        const threshold = palmSize * 0.08;
+        // 2. Thumb Analysis
+        // Thumb is "Open" if tip is far from index MCP base
+        const thumbOpenDist = dist(thumbTip, indexMcp);
+        const isThumbOpen = thumbOpenDist > palmScale * 0.5;
 
-        const indexScore = getExtensionScore(8, 6);
-        const middleScore = getExtensionScore(12, 10);
-        const ringScore = getExtensionScore(16, 14);
-        const pinkyScore = getExtensionScore(20, 18);
+        // Thumb Direction (is it pointing UP relative to hand?)
+        // We compare Tip.y vs MCP.y. 
+        // Note: screen coords Y increases downwards. So smaller Y = higher.
+        const thumbVertical = thumbMcp.y - thumbTip.y;
+        const isThumbUp = thumbVertical > palmScale * 0.3; // Significantly above MCP
+
+        // 3. Pinch Detection (Thumb tip close to Index tip)
+        const pinchDist = dist(thumbTip, indexTip);
+        const isPinch = pinchDist < palmScale * 0.25;
 
         return {
-            index: indexScore > threshold,
-            middle: middleScore > threshold,
-            ring: ringScore > threshold,
-            pinky: pinkyScore > threshold,
-            indexScore,
-            middleScore,
-            ringScore,
-            pinkyScore
+            thumb: { isOpen: isThumbOpen, isUp: isThumbUp },
+            index: { isOpen: isFingerOpen(indexTip, indexPip, indexMcp) },
+            middle: { isOpen: isFingerOpen(middleTip, middlePip, middleMcp) },
+            ring: { isOpen: isFingerOpen(ringTip, ringPip, ringMcp) },
+            pinky: { isOpen: isFingerOpen(pinkyTip, pinkyPip, pinkyMcp) },
+            isPinch
         };
     }
 }

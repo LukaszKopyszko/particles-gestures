@@ -6,7 +6,7 @@ export interface HandData {
     isDetected: boolean;
 }
 
-export type GestureType = 'none' | 'open' | 'fist' | 'pointing' | 'peace' | 'middle' | 'thumbsup';
+export type GestureType = 'none' | 'open' | 'fist' | 'pointing' | 'peace' | 'middle' | 'thumbsup' | 'ok';
 
 interface InputState {
     hand: HandData;
