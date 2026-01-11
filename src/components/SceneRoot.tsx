@@ -33,7 +33,8 @@ export default function SceneRoot() {
         isMiddle: false,
         aspect: 1,
         colorPaletteIndex: 0,
-        explosionStrength: 0
+        explosionStrength: 0,
+        visualMode: 'kinetic'
     });
 
     const updateHand = useInputStore((s) => s.updateHand);
@@ -43,6 +44,12 @@ export default function SceneRoot() {
     const triggerMiddleFinger = useInputStore((s) => s.triggerMiddleFinger);
     const triggerThumbsUp = useInputStore((s) => s.triggerThumbsUp);
     const explosionTrigger = useInputStore((s) => s.explosionTrigger);
+    const visualMode = useInputStore((s) => s.visualMode);
+
+    // Sync visual mode to ref
+    useEffect(() => {
+        inputStateRef.current.visualMode = visualMode;
+    }, [visualMode]);
 
     const normalizer = useRef(new HandStateNormalizer());
     const classifier = useRef(new GestureClassifier());

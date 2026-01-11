@@ -20,6 +20,8 @@ export const HUD: React.FC = () => {
     const hideMiddleMessage = useInputStore((s) => s.hideMiddleMessage);
     const showThumbsUp = useInputStore((s) => s.showThumbsUp);
     const hideThumbsUp = useInputStore((s) => s.hideThumbsUp);
+    const visualMode = useInputStore((s) => s.visualMode);
+    const setVisualMode = useInputStore((s) => s.setVisualMode);
 
     const [middleVisible, setMiddleVisible] = useState(false);
     const [thumbsVisible, setThumbsVisible] = useState(false);
@@ -231,20 +233,40 @@ export const HUD: React.FC = () => {
                 </div>
             </div>
 
-            {/* Bottom Right - Position */}
-            {hand.isDetected && (
-                <div style={{
-                    position: 'absolute',
-                    bottom: 12,
-                    right: 12,
-                    zIndex: 50,
-                    pointerEvents: 'none',
-                    ...baseStyle,
-                    color: 'rgba(255,255,255,0.2)'
-                }}>
-                    {(hand.x * 100).toFixed(0)}% / {(hand.y * 100).toFixed(0)}%
-                </div>
-            )}
+            {/* Bottom Right - Mode Switcher */}
+            <div style={{
+                position: 'absolute',
+                bottom: 12,
+                right: 12,
+                zIndex: 50,
+                display: 'flex',
+                gap: 8
+            }}>
+                {(['kinetic', 'galaxy', 'fire', 'rain'] as const).map((mode) => (
+                    <button
+                        key={mode}
+                        onClick={() => setVisualMode(mode)}
+                        style={{
+                            background: visualMode === mode ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.5)',
+                            color: visualMode === mode ? '#000' : 'rgba(255,255,255,0.6)',
+                            border: '1px solid rgba(255,255,255,0.2)',
+                            borderRadius: visualMode === mode ? 16 : 8,
+                            padding: '6px 12px',
+                            cursor: 'pointer',
+                            fontSize: 10,
+                            fontFamily: 'inherit',
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: 1,
+                            transition: 'all 0.2s',
+                            outline: 'none',
+                            pointerEvents: 'auto'
+                        }}
+                    >
+                        {mode}
+                    </button>
+                ))}
+            </div>
         </>
     );
 };

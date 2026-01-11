@@ -26,7 +26,7 @@
 | **HUD / UI** | ✅ Gotowe | FPS, status, legenda gestów, powiadomienia |
 | **Mobile Support** | ✅ Gotowe | `dvh`, responsywność |
 | **Audio** | ❌ Do zrobienia | Reakcja na dźwięk / SFX gestów |
-| **Tryby wizualne** | 🔄 W planach | Galaxy, Fire, Rain |
+| **Tryby wizualne** | ✅ Gotowe | 4 tryby: Kinetic, Galaxy, Fire, Rain z płynnym przejściem (morphing shaders) |
 
 **Legenda:** ❌ Do zrobienia | 🔄 W trakcie | ✅ Gotowe | ⏸️ Wstrzymane
 

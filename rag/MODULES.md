@@ -20,13 +20,14 @@ Odpowiada za inicjalizację kamery, strumieniowanie video i przetwarzanie klatek
 ### Algorytm Klasyfikacji (`GestureClassifier`)
 Nowa implementacja oparta na hierarchii i geometrii:
 1. **Analiza:** Oblicza odległości Tip-Wrist vs PIP-Wrist (czy palec otwarty?), relacje kciuka (odstaje? w górę?), oraz "szczypanie" (pinch distance).
-2. **Drzewo Decyzyjne (Hierarchia):**
-   - 1. **OK** (Pinch + 3 open)
-   - 2. **Middle** (Middle open only)
-   - 3. **ThumbsUp** (Thumb UP + others closed)
-   - 4. **Peace** (Index + Middle open)
-   - ...innne...
-   - Fallback: Open
+2. **Drzewo Decyzyjne (Hierarchia Priorytetów):**
+   - 1. **OK (👌)**: Pinch distance < threshold + Middle/Ring/Pinky Open.
+   - 2. **Middle (🖕)**: Middle Open + Index/Ring/Pinky Closed.
+   - 3. **Thumbs Up (👍)**: Thumb UP (High Y diff) + Fingers Closed.
+   - 4. **Peace (✌️)**: Index & Middle Open + Ring/Pinky Closed.
+   - 5. **Pointing (☝️)**: Index Open + Middle/Ring/Pinky Closed.
+   - 6. **Fist (✊)**: All fingers Closed + Thumb NOT Up.
+   - 7. **Open (✋)**: Default/Fallback when multiple fingers are open.
 
 ### Uwagi
 - Klasyfikator używa "Palm Scale" (odległość nadgarstek-środek) do normalizacji progów, dzięki czemu działa niezależnie od odległości dłoni od kamery.
@@ -46,14 +47,30 @@ Silnik renderujący oparty na Three.js. Generuje 5000 cząstek, które reagują 
 | `SceneRoot.tsx` | React wrapper. Łączy Vision (tracker) ze Scene (engine). Obsługuje pętlę `requestAnimationFrame`. |
 
 ### Shadery (GLSL)
-Wbudowane w `ParticleEngine.ts`:
-- **Vertex Shader:** Oblicza pozycję. Dodaje "organic drift" (sin/cos), obsługuje przyciąganie do dłoni (`pull`) i efekt eksplozji (`uExplosion`).
-- **Fragment Shader:** Obsługuje kolory (mix palet) i "glow" cząsteczek.
+Wbudowane w `ParticleEngine.ts`. Silnik obsługuje **Morphing Shaders** - płynną interpolację między 4 trybami wizualnymi sterowaną uniformem `uMode` (float):
 
-### Interakcje
-- **Open Hand:** Cząstki płyną za dłonią.
-- **Fist:** Zmiana palety kolorów (impuls w shaderze).
-- **Middle Finger:** Triggeruje `uExplosion` -> gwałtowne rozproszenie cząstek na zewnątrz + czerwony kolor.
+1.  **Kinetic (Default):** Organiczny dryf + przyciąganie do dłoni.
+2.  **Galaxy:** Spiralna rotacja wokół centrum, grawitacja orbitalna dłoni ("Czarna Dziura").
+3.  **Fire:** Turbulencyjny ruch w górę (Y+), noise, dłoń odpycha cząstki (wiatr).
+4.  **Rain:** Ruch w dół (Y-), efekt "parasola" (odbijanie kropel od dłoni).
+
+Zmiana trybu interpoluje pozycje (`mix()`) przez ok. 0.5s, co daje efekt płynnej transformacji całego układu.
+
+- **Vertex Shader:** Oblicza 4 różne pozycje i miksuje je wagowo.
+- **Fragment Shader:** Dostosowuje wygląd (np. ostrzejsze krople w trybie Rain).
+
+### Interakcje (Fizyka Dłoni)
+Interakcja dłoni z cząsteczkami zmienia się dynamicznie w zależności od trybu wizualnego:
+- **Kinetic (Default):** Przyciąganie (`Attraction`). Cząstki płyną za dłonią z opóźnieniem.
+- **Galaxy:** Grawitacja orbitalna (`Black Hole`). Dłoń działa jak centrum grawitacyjne układu spiralnego.
+- **Fire:** Odpychanie turbulencyjne (`Wind`). Dłoń działa jak podmuch wiatru rozganiający "płomienie".
+- **Rain:** Efekt parasola (`Umbrella`). Cząstki spadające z góry odbijają się od wirtualnej bariery powyżej dłoni.
+
+### Gesty (Zdarzenia)
+- **Fist (✊):** Cykl kolorów. Zmienia paletę i dodaje ciepły blask w shaderze.
+- **Middle Finger (🖕):** Eksplozja (`uExplosion`). Gwałtowny impuls odpychający wszystkie cząstki od środka ekranu.
+- **Thumbs Up (👍):** Informacja zwrotna ("NICE!") na ekranie (UI Overlay).
+- **OK Sign (👌):** Wyświetla status "Perfect" w HUD (przygotowanie pod tryb precyzyjny/wireframe).
 
 ---
 
