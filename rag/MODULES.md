@@ -46,31 +46,36 @@ Silnik renderujący oparty na Three.js. Generuje 5000 cząstek, które reagują 
 | `ParticleEngine.ts` | Inicjalizuje Three.js, zarządza buforami cząstek i ShaderMaterialem. |
 | `SceneRoot.tsx` | React wrapper. Łączy Vision (tracker) ze Scene (engine). Obsługuje pętlę `requestAnimationFrame`. |
 
+### Audio (Web Audio API)
+Moduł `AudioEngine.ts` zarządza warstwą dźwiękową:
+- **Background Music:** Klimatyczny loop ambientowy (Mixkit).
+- **FFT Analysis:** `AnalyserNode` dostarcza dane o amplitudzie częstotliwości (overall intensity).
+- **Gesture SFX:** 
+  - `Middle Finger` -> Deep Glitch Impact.
+  - `Fist` -> Fast Magic Sweep.
+
 ### Shadery (GLSL)
-Wbudowane w `ParticleEngine.ts`. Silnik obsługuje **Morphing Shaders** - płynną interpolację między 4 trybami wizualnymi sterowaną uniformem `uMode` (float):
+Wbudowane w `ParticleEngine.ts`. Silnik obsługuje **Morphing Shaders** oraz **Audio-Reactivity**:
 
-1.  **Kinetic (Default):** Organiczny dryf + przyciąganie do dłoni.
-2.  **Galaxy:** Spiralna rotacja wokół centrum, grawitacja orbitalna dłoni ("Czarna Dziura").
-3.  **Fire:** Turbulencyjny ruch w górę (Y+), noise, dłoń odpycha cząstki (wiatr).
-4.  **Rain:** Ruch w dół (Y-), efekt "parasola" (odbijanie kropel od dłoni).
+1.  **Kinetic:** Organiczny dryf + przyciąganie do dłoni.
+2.  **Galaxy:** Spiralna rotacja. Dźwięk powoduje pulsowanie promienia spirali.
+3.  **Fire:** Ruch w górę. Dźwięk zwiększa turbulencje i wysokość płomieni.
+4.  **Rain:** Ruch w dół. Efekt parasola.
 
-Zmiana trybu interpoluje pozycje (`mix()`) przez ok. 0.5s, co daje efekt płynnej transformacji całego układu.
-
-- **Vertex Shader:** Oblicza 4 różne pozycje i miksuje je wagowo.
-- **Fragment Shader:** Dostosowuje wygląd (np. ostrzejsze krople w trybie Rain).
+Uniform `uAudio` steruje jasnością cząstek (exposure) i ich rozmiarem w czasie rzeczywistym.
 
 ### Interakcje (Fizyka Dłoni)
 Interakcja dłoni z cząsteczkami zmienia się dynamicznie w zależności od trybu wizualnego:
 - **Kinetic (Default):** Przyciąganie (`Attraction`). Cząstki płyną za dłonią z opóźnieniem.
-- **Galaxy:** Grawitacja orbitalna (`Black Hole`). Dłoń działa jak centrum grawitacyjne układu spiralnego.
-- **Fire:** Odpychanie turbulencyjne (`Wind`). Dłoń działa jak podmuch wiatru rozganiający "płomienie".
-- **Rain:** Efekt parasola (`Umbrella`). Cząstki spadające z góry odbijają się od wirtualnej bariery powyżej dłoni.
+- **Galaxy:** Grawitacja orbitalna (`Black Hole`). Dłoń działa jak centrum grawitacyjne.
+- **Fire:** Odpychanie turbulencyjne (`Wind`).
+- **Rain:** Efekt parasola (`Umbrella`).
 
 ### Gesty (Zdarzenia)
-- **Fist (✊):** Cykl kolorów. Zmienia paletę i dodaje ciepły blask w shaderze.
-- **Middle Finger (🖕):** Eksplozja (`uExplosion`). Gwałtowny impuls odpychający wszystkie cząstki od środka ekranu.
-- **Thumbs Up (👍):** Informacja zwrotna ("NICE!") na ekranie (UI Overlay).
-- **OK Sign (👌):** Wyświetla status "Perfect" w HUD (przygotowanie pod tryb precyzyjny/wireframe).
+- **Fist (✊):** Cykl kolorów + dźwięk "Sweep".
+- **Middle Finger (🖕):** Eksplozja (`uExplosion`) + dźwięk "Boom Impact".
+- **Thumbs Up (👍):** Informacja zwrotna ("NICE!") na ekranie.
+- **OK Sign (👌):** Status "Perfect" w HUD.
 
 ---
 

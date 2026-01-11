@@ -19,6 +19,7 @@ export interface ParticleSystemState {
     colorPaletteIndex: number;
     explosionStrength: number;
     visualMode: 'kinetic' | 'galaxy' | 'fire' | 'rain';
+    audioIntensity: number; // 0.0 - 1.0 from FFT
 }
 
 const PALETTES = [
@@ -89,6 +90,7 @@ export class ParticleEngine {
                 uNextColor1: { value: new THREE.Color(PALETTES[0][0]) },
                 uNextColor2: { value: new THREE.Color(PALETTES[0][1]) },
                 uBlend: { value: 0 },
+                uAudio: { value: 0 },
                 uAspect: { value: window.innerWidth / window.innerHeight }
             },
             vertexShader: `
@@ -97,10 +99,14 @@ export class ParticleEngine {
         uniform float uFist;
         uniform float uExplosion;
         uniform float uMode;
+        uniform float uAudio;
         uniform float uAspect;
         attribute vec2 aRandom;
         varying float vAlpha;
         varying float vExplosion;
+        varying float vAudio;
+        varying float vFireLife;
+        varying float vIsFire;
         
         vec2 rotate(vec2 v, float a) {
             float s = sin(a); float c = cos(a);
@@ -110,6 +116,13 @@ export class ParticleEngine {
         void main() {
           vec3 pos = position;
           
+          float mG = clamp(1.0 - abs(uMode - 1.0), 0.0, 1.0);
+          float mF = clamp(1.0 - abs(uMode - 2.0), 0.0, 1.0);
+          float mR = clamp(uMode - 2.0, 0.0, 1.0);
+          float mK = clamp(1.0 - uMode, 0.0, 1.0);
+          
+          vIsFire = step(0.5, mF);
+
           // --- KINETIC ---
           vec3 kineticPos = pos;
           kineticPos.x += sin(uTime * 0.2 + aRandom.x * 6.28) * 4.0;
@@ -121,22 +134,22 @@ export class ParticleEngine {
           float spiralAngle = uTime * 0.2 + (500.0 / (distCenter + 10.0)) + aRandom.x * 6.0;
           vec2 rotGalaxy = rotate(pos.xy, spiralAngle * 0.5);
           vec3 galaxyPos = vec3(rotGalaxy, sin(spiralAngle) * 3.0);
+          galaxyPos.xy *= (1.0 + uAudio * 0.15);
 
-          // --- FIRE ---
-          float riseSpeed = 30.0 + aRandom.y * 20.0;
+          // --- FIRE (Realistic Embers) ---
+          float riseSpeed = 40.0 + aRandom.y * 30.0;
           float yFire = mod(uTime * riseSpeed + aRandom.x * 1000.0, 250.0) - 125.0;
-          vec3 firePos = vec3(pos.x + sin(uTime * 1.5 + yFire * 0.05) * 10.0, yFire, pos.z);
+          float fireLife = (yFire + 125.0) / 250.0; // 0 to 1
+          vFireLife = fireLife;
+          
+          float fireSway = sin(uTime * 2.0 + yFire * 0.04 + aRandom.x * 5.0) * (20.0 * fireLife);
+          vec3 firePos = vec3(pos.x * (0.4 + fireLife * 0.6) + fireSway, yFire, pos.z * 0.5);
+          firePos.y += uAudio * 30.0 * fireLife;
 
           // --- RAIN ---
           float fallSpeed = 50.0 + aRandom.y * 40.0;
           float yRain = 125.0 - mod(uTime * fallSpeed + aRandom.x * 1000.0, 250.0);
           vec3 rainPos = vec3(pos.x + sin(uTime * 0.5) * 10.0, yRain, pos.z);
-
-          // --- BRANCHLESS MODE MAPPING ---
-          float mG = clamp(1.0 - abs(uMode - 1.0), 0.0, 1.0);
-          float mF = clamp(1.0 - abs(uMode - 2.0), 0.0, 1.0);
-          float mR = clamp(uMode - 2.0, 0.0, 1.0);
-          float mK = clamp(1.0 - uMode, 0.0, 1.0);
 
           vec3 finalPos = kineticPos * mK + galaxyPos * mG + firePos * mF + rainPos * mR;
 
@@ -146,19 +159,15 @@ export class ParticleEngine {
           float dist = length(delta);
           float pull = smoothstep(120.0, 0.0, dist);
           
-          // Influence based on mode (using steps instead of ifs)
           float isGalaxy = step(0.5, mG);
-          float isFire = step(0.5, mF);
+          float isFire = vIsFire;
           float isRain = step(0.5, mR);
           float isKinetic = step(0.5, mK);
 
-          // Kinetic: Attraction
           finalPos.xy += delta * pull * 0.12 * isKinetic * (1.0 - uFist * 0.5);
-          // Galaxy: Gravity
-          finalPos.xy += normalize(delta + 0.001) * pull * 1.5 * isGalaxy;
-          // Fire: Repel
+          finalPos.xy += normalize(delta + 0.001) * pull * (1.5 + uAudio * 2.0) * isGalaxy;
           finalPos.xy -= normalize(delta + 0.001) * pull * 2.0 * isFire;
-          // Rain: Umbrella
+          
           float rainBounce = step(dist, 40.0) * step(handWorld.y, finalPos.y);
           finalPos.xy -= normalize(delta + 0.001) * (40.0 - dist) * 0.5 * rainBounce * isRain;
           finalPos.y += 2.0 * rainBounce * isRain;
@@ -171,12 +180,18 @@ export class ParticleEngine {
           finalPos.z += (aRandom.y - 0.5) * uExplosion * 40.0;
 
           vec4 mv = modelViewMatrix * vec4(finalPos, 1.0);
-          float baseSize = mix(8.0, 5.0, isGalaxy) + uExplosion * 4.0;
+          
+          float fireSize = mix(12.0, 2.0, fireLife);
+          float baseSize = mix(8.0, 5.0, isGalaxy);
+          baseSize = mix(baseSize, fireSize, isFire);
+          baseSize += uExplosion * 4.0 + uAudio * 6.0;
+          
           gl_PointSize = max(2.0, baseSize * (100.0 / -mv.z));
           gl_Position = projectionMatrix * mv;
 
-          vAlpha = 0.6 + pull * 0.4 + uExplosion * 0.3;
+          vAlpha = (0.6 + pull * 0.4 + uExplosion * 0.3 + uAudio * 0.2) * mix(1.0, 1.0 - fireLife, isFire);
           vExplosion = uExplosion;
+          vAudio = uAudio;
         }
       `,
             fragmentShader: `
@@ -188,8 +203,12 @@ export class ParticleEngine {
         uniform float uFist;
         uniform float uExplosion;
         uniform float uMode;
+        uniform float uAudio;
         varying float vAlpha;
         varying float vExplosion;
+        varying float vAudio;
+        varying float vFireLife;
+        varying float vIsFire;
 
         void main() {
           float d = length(gl_PointCoord - 0.5);
@@ -204,13 +223,21 @@ export class ParticleEngine {
           
           vec3 c1 = mix(uColor1, uColor2, glow);
           vec3 c2 = mix(uNextColor1, uNextColor2, glow);
-          vec3 color = mix(c1, c2, uBlend);
+          vec3 baseColor = mix(c1, c2, uBlend);
           
-          color *= 1.3;
+          // --- FIRE COLOR LOGIC (Vibrant Flames) ---
+          // White-Yellow core (bottom) -> Orange -> Red -> Dark Ember (top)
+          vec3 fireColor = mix(vec3(1.2, 1.1, 0.6), vec3(1.0, 0.5, 0.0), smoothstep(0.0, 0.3, vFireLife));
+          fireColor = mix(fireColor, vec3(1.0, 0.2, 0.0), smoothstep(0.3, 0.7, vFireLife));
+          fireColor = mix(fireColor, vec3(0.4, 0.05, 0.0), smoothstep(0.7, 1.0, vFireLife));
+          
+          vec3 color = mix(baseColor, fireColor, vIsFire);
+          
+          color *= (1.3 + vAudio * 0.5);
           color += vec3(0.25, 0.12, 0.0) * uFist * glow;
           color = mix(color, vec3(1.0, 0.3, 0.1), vExplosion * 0.85);
           
-          float alpha = glow * vAlpha * 1.2;
+          float alpha = glow * vAlpha * (vIsFire > 0.5 ? 2.5 : 1.5);
           gl_FragColor = vec4(color, clamp(alpha, 0.0, 1.0));
         }
       `,
@@ -245,6 +272,9 @@ export class ParticleEngine {
 
         // Explosion
         this.material.uniforms.uExplosion.value = state.explosionStrength;
+
+        // Audio Reactivity
+        this.material.uniforms.uAudio.value = state.audioIntensity;
 
         // Mode Interpolation
         switch (state.visualMode) {

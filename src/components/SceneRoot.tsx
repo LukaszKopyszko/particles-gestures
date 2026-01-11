@@ -13,6 +13,7 @@ import { ParticleEngine, ParticleSystemState } from '@/lib/scene/ParticleEngine'
 import { HandTrackerService } from '@/lib/vision/HandTrackerService';
 import { HandStateNormalizer } from '@/lib/vision/HandStateNormalizer';
 import { GestureClassifier, GestureType } from '@/lib/vision/GestureClassifier';
+import { AudioEngine } from '@/lib/audio/AudioEngine';
 import { CameraPreviewOverlay } from './CameraPreviewOverlay';
 import { IntroOverlay } from './IntroOverlay';
 import { HUD } from './HUD';
@@ -22,6 +23,7 @@ export default function SceneRoot() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const engineRef = useRef<ParticleEngine | null>(null);
     const trackerRef = useRef<HandTrackerService | null>(null);
+    const audioRef = useRef<AudioEngine | null>(null);
     const [hasStarted, setHasStarted] = React.useState(false);
 
     const inputStateRef = useRef<ParticleSystemState>({
@@ -34,7 +36,8 @@ export default function SceneRoot() {
         aspect: 1,
         colorPaletteIndex: 0,
         explosionStrength: 0,
-        visualMode: 'kinetic'
+        visualMode: 'kinetic',
+        audioIntensity: 0
     });
 
     // We use selectors to only re-render when a specific value changes
@@ -50,6 +53,12 @@ export default function SceneRoot() {
     // Note: We DON'T select 'hand' here because we don't need it to trigger re-renders in SceneRoot.
     // The engine loop reads from inputStateRef.current which we update manually.
 
+    // Initial audio engine setup
+    useEffect(() => {
+        audioRef.current = new AudioEngine();
+        return () => audioRef.current?.stop();
+    }, []);
+
     // Sync visual mode to ref
     useEffect(() => {
         inputStateRef.current.visualMode = visualMode;
@@ -64,6 +73,7 @@ export default function SceneRoot() {
         if (explosionTrigger > lastExplosion.current) {
             lastExplosion.current = explosionTrigger;
             inputStateRef.current.explosionStrength = 1.0;
+            audioRef.current?.playExplosion();
         }
     }, [explosionTrigger]);
 
@@ -94,6 +104,7 @@ export default function SceneRoot() {
                     inputStateRef.current.colorPaletteIndex += 1;
                     const idx = inputStateRef.current.colorPaletteIndex % COLOR_NAMES.length;
                     setColor(idx, COLOR_NAMES[idx]);
+                    audioRef.current?.playSweep();
                 }
 
                 if (gestureResult.gesture === GestureType.MIDDLE) {
@@ -114,6 +125,13 @@ export default function SceneRoot() {
 
         tracker.initialize().catch(console.error);
     }, [updateHand, setGesture, setColor, triggerMiddleFinger, triggerThumbsUp]);
+
+    const handleStartExperience = async () => {
+        if (audioRef.current) {
+            await audioRef.current.init();
+        }
+        setHasStarted(true);
+    };
 
     useEffect(() => {
         if (!canvasRef.current) return;
@@ -143,6 +161,12 @@ export default function SceneRoot() {
             }
             if (fpsFrames.current.length % 10 === 0) {
                 setFps(fpsFrames.current.length);
+            }
+
+            // Sync audio analysis to shader
+            if (audioRef.current) {
+                const analysis = audioRef.current.getAnalysis();
+                inputStateRef.current.audioIntensity = analysis.overall;
             }
 
             if (inputStateRef.current.explosionStrength > 0) {
@@ -190,7 +214,7 @@ export default function SceneRoot() {
                 }}
             />
 
-            {!hasStarted && <IntroOverlay onStart={() => setHasStarted(true)} />}
+            {!hasStarted && <IntroOverlay onStart={handleStartExperience} />}
 
             {hasStarted && (
                 <>

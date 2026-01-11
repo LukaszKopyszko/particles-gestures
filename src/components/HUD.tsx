@@ -42,13 +42,23 @@ const Legend = memo(({ gesture }: { gesture: string }) => {
                 <div key={item.key} style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 5,
-                    marginBottom: 3,
-                    opacity: gesture === item.key ? 1 : 0.35,
-                    transition: 'opacity 0.2s'
+                    gap: 6,
+                    marginBottom: 4,
+                    opacity: gesture === item.key ? 1 : 0.45,
+                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    transform: gesture === item.key ? 'translateX(4px)' : 'none',
+                    filter: gesture === item.key ? 'drop-shadow(0 0 8px rgba(255,255,255,0.3))' : 'none'
                 }}>
-                    <span style={{ fontSize: 11 }}>{item.icon}</span>
-                    <span style={{ ...baseStyle, color: 'rgba(255,255,255,0.7)', fontSize: 8 }}>{item.label}</span>
+                    <span style={{ fontSize: 12 }}>{item.icon}</span>
+                    <span style={{
+                        ...baseStyle,
+                        color: '#ffffff',
+                        fontSize: 8,
+                        fontWeight: gesture === item.key ? 700 : 400,
+                        textShadow: '0 1px 2px rgba(0,0,0,0.8)'
+                    }}>
+                        {item.label}
+                    </span>
                 </div>
             ))}
         </div>
@@ -66,17 +76,19 @@ const Stats = memo(({ fps, isDetected, colorName }: { fps: number, isDetected: b
             pointerEvents: 'none',
             textAlign: 'right'
         }}>
-            <div style={{ ...baseStyle, color: 'rgba(255,255,255,0.35)' }}>
-                <span style={{ color: fps > 50 ? '#4ade80' : fps > 30 ? '#fbbf24' : '#f87171' }}>{fps}</span> FPS
+            <div style={{ ...baseStyle, color: 'rgba(255,255,255,0.5)', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+                <span style={{ color: fps > 50 ? '#4ade80' : fps > 30 ? '#fbbf24' : '#f87171', fontWeight: 700 }}>{fps}</span> FPS
             </div>
             <div style={{
                 ...baseStyle,
                 color: isDetected ? '#4ade80' : '#f87171',
-                marginTop: 3
+                marginTop: 3,
+                textShadow: isDetected ? '0 0 8px rgba(74,222,128,0.4)' : 'none',
+                fontWeight: 600
             }}>
                 {isDetected ? '● TRACKING' : '○ SEARCHING'}
             </div>
-            <div style={{ ...baseStyle, color: 'rgba(255,255,255,0.2)', marginTop: 3 }}>
+            <div style={{ ...baseStyle, color: 'rgba(255,255,255,0.4)', marginTop: 3, textTransform: 'uppercase', fontSize: 8 }}>
                 {colorName}
             </div>
         </div>
@@ -194,8 +206,8 @@ export const HUD: React.FC = () => {
 
             {/* UI Groups */}
             <div style={{ position: 'absolute', top: 12, left: 12, zIndex: 50, pointerEvents: 'none' }}>
-                <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.85)', letterSpacing: 3 }}>AETHER</div>
-                <div style={{ ...baseStyle, color: 'rgba(255,255,255,0.25)', marginTop: 1 }}>Gesture Control</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#ffffff', letterSpacing: 4, textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>AETHER</div>
+                <div style={{ ...baseStyle, color: 'rgba(255,255,255,0.45)', marginTop: 1, textTransform: 'uppercase', fontSize: 7, letterSpacing: 2 }}>Gesture Kinetic System</div>
             </div>
 
             <Legend gesture={gesture} />
@@ -204,12 +216,14 @@ export const HUD: React.FC = () => {
             {/* Bottom Center - Current Status */}
             <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 50, pointerEvents: 'none' }}>
                 <div style={{
-                    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', borderRadius: 16,
-                    background: gesture === 'middle' ? 'rgba(255,50,50,0.3)' : gesture === 'thumbsup' ? 'rgba(74,222,128,0.3)' : 'rgba(255,255,255,0.06)',
-                    border: '1px solid rgba(255,255,255,0.08)'
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '8px 20px', borderRadius: 20,
+                    background: gesture === 'middle' ? 'rgba(255,50,50,0.4)' : gesture === 'thumbsup' ? 'rgba(74,222,128,0.4)' : 'rgba(0,0,0,0.6)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    backdropFilter: 'blur(8px)',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
                 }}>
-                    <span style={{ fontSize: 14 }}>{current.icon}</span>
-                    <span style={{ ...baseStyle, color: 'rgba(255,255,255,0.7)', fontSize: 10 }}>{current.label}</span>
+                    <span style={{ fontSize: 16 }}>{current.icon}</span>
+                    <span style={{ ...baseStyle, color: '#ffffff', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }}>{current.label}</span>
                 </div>
             </div>
 

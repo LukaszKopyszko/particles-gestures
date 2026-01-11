@@ -17,25 +17,24 @@
 - **Visual Modes Implementation:** Dodano 4 tryby wizualne: `Kinetic` (standard), `Galaxy` (orbitalny), `Fire` (termiczny/w górę), `Rain` (deszcz/parasol).
 - **Morphing Shaders:** Zaimplementowano płynną interpolację (morphing) pozycji i zachowań cząstek w shaderach GLSL przy przełączaniu trybów.
 - **Intro / Onboarding:** Stworzono komponent `IntroOverlay.tsx` z instrukcjami i przyciskiem Start, co zapewnia lepsze UX i opóźnia prośbę o dostęp do kamery.
-- **HUD Enhancement:** Dodano interaktywny przełącznik trybów wizualnych (Mode Switcher) w prawym dolnym rogu.
-- **Metadata Integration:** Uzupełniono nagłówki META we wszystkich plikach źródłowych zgodnie z konwencją RAG.
-- **README Update:** Całkowicie przeredagowano `README.md` na profesjonalną dokumentację projektu.
-- **Refaktoryzacja GestureClassifier:** (Poprzednio) Zaawansowana analiza geometryczna i nowe gesty (OK, ThumbsUp).
+- **Audio System Integration:** Zaimplementowano `AudioEngine.ts` z podkładem ambientowym, analizą FFT (reaktywność cząstek na dźwięk) oraz efektami SFX dla gestów.
+- **Visual Reactivity:** Shadery reagują na bit muzyki (rozmiar, jasność, wysokość ognia).
+- **Optimization & Performance:** (Poprzednio) Throttling detekcji dłoni, branchless shaders, dynamiczna liczba cząstek dla mobile.
+- **RAG Update:** Wszystkie moduły (w tym Audio) zostały udokumentowane w systemie RAG.
 
 ---
 
 ## Aktualny stan
 
-Aplikacja "Aether Kinetic" jest w zaawansowanej fazie prototypu. Posiada kompletną logikę gestów, responsywny interfejs, system onboardingu oraz 4 unikalne, płynnie przełączalne tryby wizualne. Wszystkie kluczowe moduły są udokumentowane w `rag/` oraz posiadają metadane w kodzie.
+Aplikacja "Aether Kinetic" jest kompletnym, zoptymalizowanym doświadczeniem audiowizualnym. Posiada system onboardingowy, 4 tryby wizualne, reaktywność na dźwięk oraz precyzyjne sterowanie gestami. Projekt jest w pełni udokumentowany.
 
 ---
 
 ## Next steps
 
-1. **Audio Integration:** Dodanie reaktywności na dźwięk (FFT) oraz efektów dźwiękowych dla gestów (np. "whoosh" przy eksplozji).
-2. **Advanced Shaders:** Dodanie efektów post-processingu (Bloom, Chromatic Aberration) dostępnych jako opcje.
-3. **Performance Optimization:** Optymalizacja liczby cząstek (obecnie 8000) pod kątem urządzeń mobilnych.
-4. **Custom Palettes:** Możliwość definiowania własnych kolorów przez użytkownika.
+1. **Custom Track Upload:** Umożliwienie użytkownikowi wrzucenia własnego pliku muzycznego.
+2. **Advanced Post-Processing:** Bloom, Chromatic Aberration jako opcje UI.
+3. **Multi-Gesture Sequences:** Wyzwalanie specjalnych efektów przy wykonaniu sekwencji gestów.
 
 ---
 

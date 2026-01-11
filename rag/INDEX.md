@@ -23,9 +23,10 @@
 | **MediaPipe** | ✅ Gotowe | Detekcja dłoni, landmarki 3D |
 | **Particle Engine** | ✅ Gotowe | Three.js, shadery GLSL, 5000 cząstek |
 | **Gesture Logic** | ✅ Gotowe | Klasyfikator geometryczny: Fist, OK, Peace, ThumbsUp, Middle |
+| **Intro / Onboarding** | ✅ Gotowe | Ekran startowy z instrukcjami |
 | **HUD / UI** | ✅ Gotowe | FPS, status, legenda gestów, powiadomienia |
 | **Mobile Support** | ✅ Gotowe | `dvh`, responsywność |
-| **Audio** | ❌ Do zrobienia | Reakcja na dźwięk / SFX gestów |
+| **Audio** | ✅ Gotowe | Tło ambientowe, analiza FFT (reaktywność), SFX gestów |
 | **Tryby wizualne** | ✅ Gotowe | 4 tryby: Kinetic, Galaxy, Fire, Rain z płynnym przejściem (morphing shaders) |
 
 **Legenda:** ❌ Do zrobienia | 🔄 W trakcie | ✅ Gotowe | ⏸️ Wstrzymane
