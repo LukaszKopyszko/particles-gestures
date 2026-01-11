@@ -27,14 +27,21 @@ export class AudioEngine {
 
     constructor() {
         if (typeof window !== 'undefined') {
-            this.bgMusic = new Audio('https://assets.mixkit.co/music/preview/mixkit-deep-urban-623.mp3');
+            // UPDATED: Previous Mixkit links were returning 403 Access Denied.
+            // Using reliable CORS-compliant placeholders for now.
+            // USER: Better to download these files and put them in /public/audio/
+
+            this.bgMusic = new Audio('https://raw.githubusercontent.com/rafaelreis-hotmart/Audio-Sample-files/master/sample.mp3');
+            this.bgMusic.crossOrigin = 'anonymous'; // Required for Web Audio API Analysis
             this.bgMusic.loop = true;
             this.bgMusic.volume = 0.4;
 
-            this.explosionSfx = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-dark-glitch-impact-double-2581.mp3');
+            this.explosionSfx = new Audio('https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3');
+            this.explosionSfx.crossOrigin = 'anonymous';
             this.explosionSfx.volume = 0.8;
 
-            this.sweepSfx = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-fast-magic-sweep-2830.mp3');
+            this.sweepSfx = new Audio('https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3');
+            this.sweepSfx.crossOrigin = 'anonymous';
             this.sweepSfx.volume = 0.5;
         }
     }
