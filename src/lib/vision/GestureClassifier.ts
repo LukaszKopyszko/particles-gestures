@@ -17,7 +17,7 @@ export interface GestureResult {
 export class GestureClassifier {
     private currentGesture: GestureType = GestureType.NONE;
     private stableFrames = 0;
-    private readonly DEBOUNCE = 4;
+    private readonly DEBOUNCE = 5;
 
     process(landmarks: any[]): GestureResult {
         if (!landmarks || landmarks.length < 21) {
@@ -28,31 +28,33 @@ export class GestureClassifier {
         const thumbState = this.getThumbState(landmarks);
 
         const { index, middle, ring, pinky } = fingerStates;
+        const allFingersCurled = !index && !middle && !ring && !pinky;
 
         let detected = GestureType.NONE;
         let confidence = 0;
 
-        // Thumbs up: thumb extended upward, all other fingers curled
-        if (thumbState.isUp && !index && !middle && !ring && !pinky) {
+        // Thumbs up: thumb clearly extended UPWARD, all fingers curled
+        // Must be very clearly UP (strict threshold)
+        if (thumbState.isUp && thumbState.isStronglyUp && allFingersCurled) {
             detected = GestureType.THUMBSUP;
             confidence = 0.95;
+        }
+        // Fist: all fingers curled AND thumb is NOT pointing up
+        else if (allFingersCurled && !thumbState.isUp) {
+            detected = GestureType.FIST;
+            confidence = 0.9;
         }
         // Middle finger: ONLY middle extended
         else if (!index && middle && !ring && !pinky) {
             detected = GestureType.MIDDLE;
             confidence = 0.95;
         }
-        // Alternative middle finger detection
+        // Alternative middle detection
         else if (middle && !index && !ring &&
-            fingerStates.middleScore > fingerStates.indexScore + 0.05 &&
-            fingerStates.middleScore > fingerStates.ringScore + 0.05) {
+            fingerStates.middleScore > fingerStates.indexScore + 0.04 &&
+            fingerStates.middleScore > fingerStates.ringScore + 0.04) {
             detected = GestureType.MIDDLE;
             confidence = 0.85;
-        }
-        // Fist: all fingers curled (thumb can be anywhere)
-        else if (!index && !middle && !ring && !pinky && !thumbState.isUp) {
-            detected = GestureType.FIST;
-            confidence = 0.9;
         }
         // Peace: index + middle extended
         else if (index && middle && !ring && !pinky) {
@@ -90,27 +92,36 @@ export class GestureClassifier {
         return { gesture: this.currentGesture, confidence, changed };
     }
 
-    private getThumbState(landmarks: any[]): { isUp: boolean; isOut: boolean } {
+    private getThumbState(landmarks: any[]): { isUp: boolean; isStronglyUp: boolean; isOut: boolean } {
         const wrist = landmarks[0];
         const thumbTip = landmarks[4];
+        const thumbIp = landmarks[3]; // IP joint
         const thumbMcp = landmarks[2];
         const indexMcp = landmarks[5];
 
-        // Thumb is "up" if tip is above MCP and above wrist
-        // And thumb is extended (tip further from palm center than MCP)
-        const thumbExtended = Math.sqrt(
-            Math.pow(thumbTip.x - wrist.x, 2) + Math.pow(thumbTip.y - wrist.y, 2)
-        ) > Math.sqrt(
-            Math.pow(thumbMcp.x - wrist.x, 2) + Math.pow(thumbMcp.y - wrist.y, 2)
-        ) * 1.2;
+        // Calculate how much higher the thumb tip is compared to the MCP
+        const thumbVerticalDiff = thumbMcp.y - thumbTip.y; // Positive = tip above MCP
 
-        // Thumb pointing upward: tip.y < mcp.y significantly
-        const isUp = thumbTip.y < thumbMcp.y - 0.05 && thumbExtended;
+        // Thumb is extended if tip is far from wrist
+        const thumbLength = Math.sqrt(
+            Math.pow(thumbTip.x - thumbMcp.x, 2) + Math.pow(thumbTip.y - thumbMcp.y, 2)
+        );
 
-        // Thumb pointing outward (to the side)
-        const isOut = Math.abs(thumbTip.x - indexMcp.x) > 0.1;
+        // Palm size for normalization
+        const palmSize = Math.sqrt(
+            Math.pow(wrist.x - landmarks[9].x, 2) + Math.pow(wrist.y - landmarks[9].y, 2)
+        );
 
-        return { isUp, isOut };
+        // isUp: thumb tip is clearly above thumb MCP (normalized by palm size)
+        const isUp = thumbVerticalDiff > palmSize * 0.15;
+
+        // isStronglyUp: very clearly pointing up (stricter threshold)
+        const isStronglyUp = thumbVerticalDiff > palmSize * 0.25;
+
+        // isOut: thumb pointing to the side
+        const isOut = Math.abs(thumbTip.x - indexMcp.x) > palmSize * 0.3;
+
+        return { isUp, isStronglyUp, isOut };
     }
 
     private getFingerStates(landmarks: any[]): {

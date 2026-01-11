@@ -120,11 +120,11 @@ export class ParticleEngine {
 
           vec4 mv = modelViewMatrix * vec4(pos, 1.0);
           
-          float baseSize = 5.0 + uExplosion * 3.0;
-          gl_PointSize = max(2.0, baseSize * (100.0 / -mv.z));
+          float baseSize = 8.0 + uExplosion * 4.0;
+          gl_PointSize = max(3.0, baseSize * (100.0 / -mv.z));
           gl_Position = projectionMatrix * mv;
 
-          vAlpha = 0.4 + pull * 0.6 + uExplosion * 0.4;
+          vAlpha = 0.6 + pull * 0.4 + uExplosion * 0.3;
           vExplosion = uExplosion;
         }
       `,
@@ -143,19 +143,24 @@ export class ParticleEngine {
           float d = length(gl_PointCoord - 0.5);
           if (d > 0.5) discard;
           
-          float glow = pow(1.0 - d * 2.0, 1.5);
+          float glow = pow(1.0 - d * 2.0, 1.2);
           
           vec3 c1 = mix(uColor1, uColor2, glow);
           vec3 c2 = mix(uNextColor1, uNextColor2, glow);
           vec3 color = mix(c1, c2, uBlend);
           
+          // Boost brightness
+          color *= 1.3;
+          
           // Fist warmth
-          color += vec3(0.2, 0.1, 0.0) * uFist * glow;
+          color += vec3(0.25, 0.12, 0.0) * uFist * glow;
           
           // Explosion = RED flash
-          color = mix(color, vec3(1.0, 0.2, 0.1), vExplosion * 0.8);
+          color = mix(color, vec3(1.0, 0.3, 0.1), vExplosion * 0.85);
           
-          gl_FragColor = vec4(color, glow * vAlpha);
+          // Make particles more solid
+          float alpha = glow * vAlpha * 1.2;
+          gl_FragColor = vec4(color, clamp(alpha, 0.0, 1.0));
         }
       `,
             transparent: true,
