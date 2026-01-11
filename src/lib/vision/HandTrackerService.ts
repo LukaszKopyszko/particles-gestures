@@ -35,7 +35,7 @@ export class HandTrackerService {
                     delegate: "GPU"
                 },
                 runningMode: "VIDEO",
-                numHands: 1
+                numHands: 2
             });
             console.log("HandLandmarker model loaded.");
         } catch (e) {

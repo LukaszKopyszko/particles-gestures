@@ -66,7 +66,7 @@ const Legend = memo(({ gesture }: { gesture: string }) => {
 });
 Legend.displayName = 'Legend';
 
-const Stats = memo(({ fps, isDetected, colorName }: { fps: number, isDetected: boolean, colorName: string }) => {
+const Stats = memo(({ fps, isDetected, isDetected2, colorName }: { fps: number, isDetected: boolean, isDetected2: boolean, colorName: string }) => {
     return (
         <div style={{
             position: 'absolute',
@@ -80,13 +80,10 @@ const Stats = memo(({ fps, isDetected, colorName }: { fps: number, isDetected: b
                 <span style={{ color: fps > 50 ? '#4ade80' : fps > 30 ? '#fbbf24' : '#f87171', fontWeight: 700 }}>{fps}</span> FPS
             </div>
             <div style={{
-                ...baseStyle,
-                color: isDetected ? '#4ade80' : '#f87171',
-                marginTop: 3,
-                textShadow: isDetected ? '0 0 8px rgba(74,222,128,0.4)' : 'none',
-                fontWeight: 600
+                display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 3
             }}>
-                {isDetected ? '● TRACKING' : '○ SEARCHING'}
+                <div style={{ ...baseStyle, color: isDetected ? '#4ade80' : '#f87171', fontSize: 7 }}>L-HAND {isDetected ? '●' : '○'}</div>
+                <div style={{ ...baseStyle, color: isDetected2 ? '#4ade80' : '#f87171', fontSize: 7 }}>R-HAND {isDetected2 ? '●' : '○'}</div>
             </div>
             <div style={{ ...baseStyle, color: 'rgba(255,255,255,0.4)', marginTop: 3, textTransform: 'uppercase', fontSize: 8 }}>
                 {colorName}
@@ -106,7 +103,7 @@ const ModeSwitcher = memo(({ currentMode, setMode }: { currentMode: VisualMode, 
             display: 'flex',
             gap: 8
         }}>
-            {(['kinetic', 'galaxy', 'fire', 'rain'] as const).map((mode) => (
+            {(['kinetic', 'galaxy', 'fire', 'rain', 'vortex', 'spectrum'] as const).map((mode) => (
                 <button
                     key={mode}
                     onClick={() => setMode(mode)}
@@ -138,9 +135,12 @@ ModeSwitcher.displayName = 'ModeSwitcher';
 export const HUD: React.FC = () => {
     // Selectors are optimized to only trigger re-render of HUD when these values change
     const isDetected = useInputStore((s) => s.hand.isDetected);
+    const isDetected2 = useInputStore((s) => s.hand2.isDetected);
     const gesture = useInputStore((s) => s.gesture);
+    const gesture2 = useInputStore((s) => s.gesture2);
     const fps = useInputStore((s) => s.fps);
     const colorName = useInputStore((s) => s.colorName);
+    const energyLevel = useInputStore((s) => s.energyLevel);
     const showMiddleMessage = useInputStore((s) => s.showMiddleMessage);
     const hideMiddleMessage = useInputStore((s) => s.hideMiddleMessage);
     const showThumbsUp = useInputStore((s) => s.showThumbsUp);
@@ -211,7 +211,27 @@ export const HUD: React.FC = () => {
             </div>
 
             <Legend gesture={gesture} />
-            <Stats fps={fps} isDetected={isDetected} colorName={colorName} />
+            <Stats fps={fps} isDetected={isDetected} isDetected2={isDetected2} colorName={colorName} />
+
+            {/* Energy Bar */}
+            <div style={{
+                position: 'absolute',
+                top: 0,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '30%',
+                height: 2,
+                background: 'rgba(255,255,255,0.05)',
+                zIndex: 100
+            }}>
+                <div style={{
+                    width: `${energyLevel * 100}%`,
+                    height: '100%',
+                    background: energyLevel > 0.9 ? '#fff' : '#4ade80',
+                    boxShadow: energyLevel > 0.8 ? '0 0 20px #fff' : 'none',
+                    transition: 'width 0.1s linear, background 0.3s'
+                }} />
+            </div>
 
             {/* Bottom Center - Current Status */}
             <div style={{ position: 'absolute', bottom: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 50, pointerEvents: 'none' }}>
@@ -220,10 +240,13 @@ export const HUD: React.FC = () => {
                     background: gesture === 'middle' ? 'rgba(255,50,50,0.4)' : gesture === 'thumbsup' ? 'rgba(74,222,128,0.4)' : 'rgba(0,0,0,0.6)',
                     border: '1px solid rgba(255,255,255,0.15)',
                     backdropFilter: 'blur(8px)',
-                    boxShadow: '0 4px 15px rgba(0,0,0,0.5)'
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.5)',
+                    opacity: isDetected || isDetected2 ? 1 : 0
                 }}>
-                    <span style={{ fontSize: 16 }}>{current.icon}</span>
-                    <span style={{ ...baseStyle, color: '#ffffff', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }}>{current.label}</span>
+                    <span style={{ fontSize: 16 }}>{current.icon} {isDetected2 && gesture2 !== 'none' && gesture2 !== gesture && ` + ${gestureInfo[gesture2]?.icon || ''}`}</span>
+                    <span style={{ ...baseStyle, color: '#ffffff', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+                        {current.label} {isDetected2 && gesture2 !== 'none' && gesture2 !== gesture && `& ${gestureInfo[gesture2]?.label || ''}`}
+                    </span>
                 </div>
             </div>
 

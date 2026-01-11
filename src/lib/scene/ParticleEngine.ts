@@ -11,6 +11,8 @@ import * as THREE from 'three';
 export interface ParticleSystemState {
     handX: number;
     handY: number;
+    hand2X: number;
+    hand2Y: number;
     handVx: number;
     handVy: number;
     isFist: boolean;
@@ -18,8 +20,9 @@ export interface ParticleSystemState {
     aspect: number;
     colorPaletteIndex: number;
     explosionStrength: number;
-    visualMode: 'kinetic' | 'galaxy' | 'fire' | 'rain';
+    visualMode: 'kinetic' | 'galaxy' | 'fire' | 'rain' | 'vortex' | 'spectrum';
     audioIntensity: number; // 0.0 - 1.0 from FFT
+    energyLevel: number;
 }
 
 const PALETTES = [
@@ -40,6 +43,8 @@ export class ParticleEngine {
 
     private smoothX = 0.5;
     private smoothY = 0.5;
+    private smooth2X = 0.5;
+    private smooth2Y = 0.5;
     private smoothFist = 0;
     private currentPalette = 0;
     private blendProgress = 0;
@@ -82,9 +87,11 @@ export class ParticleEngine {
             uniforms: {
                 uTime: { value: 0 },
                 uHand: { value: new THREE.Vector2(0.5, 0.5) },
+                uHand2: { value: new THREE.Vector2(0.5, 0.5) },
                 uFist: { value: 0 },
                 uExplosion: { value: 0 },
-                uMode: { value: 0 }, // 0=Kinetic, 1=Galaxy, 2=Fire, 3=Rain
+                uEnergy: { value: 0 },
+                uMode: { value: 0 }, // 0=K, 1=G, 2=F, 3=R, 4=V, 5=S
                 uColor1: { value: new THREE.Color(PALETTES[0][0]) },
                 uColor2: { value: new THREE.Color(PALETTES[0][1]) },
                 uNextColor1: { value: new THREE.Color(PALETTES[0][0]) },
@@ -96,8 +103,10 @@ export class ParticleEngine {
             vertexShader: `
         uniform float uTime;
         uniform vec2 uHand;
+        uniform vec2 uHand2;
         uniform float uFist;
         uniform float uExplosion;
+        uniform float uEnergy;
         uniform float uMode;
         uniform float uAudio;
         uniform float uAspect;
@@ -107,6 +116,7 @@ export class ParticleEngine {
         varying float vAudio;
         varying float vFireLife;
         varying float vIsFire;
+        varying float vEnergy;
         
         vec2 rotate(vec2 v, float a) {
             float s = sin(a); float c = cos(a);
@@ -118,10 +128,13 @@ export class ParticleEngine {
           
           float mG = clamp(1.0 - abs(uMode - 1.0), 0.0, 1.0);
           float mF = clamp(1.0 - abs(uMode - 2.0), 0.0, 1.0);
-          float mR = clamp(uMode - 2.0, 0.0, 1.0);
+          float mR = clamp(1.0 - abs(uMode - 3.0), 0.0, 1.0);
+          float mV = clamp(1.0 - abs(uMode - 4.0), 0.0, 1.0);
+          float mS = clamp(uMode - 4.0, 0.0, 1.0); // Spectrum
           float mK = clamp(1.0 - uMode, 0.0, 1.0);
           
           vIsFire = step(0.5, mF);
+          vEnergy = uEnergy;
 
           // --- KINETIC ---
           vec3 kineticPos = pos;
@@ -136,12 +149,11 @@ export class ParticleEngine {
           vec3 galaxyPos = vec3(rotGalaxy, sin(spiralAngle) * 3.0);
           galaxyPos.xy *= (1.0 + uAudio * 0.15);
 
-          // --- FIRE (Realistic Embers) ---
+          // --- FIRE ---
           float riseSpeed = 40.0 + aRandom.y * 30.0;
           float yFire = mod(uTime * riseSpeed + aRandom.x * 1000.0, 250.0) - 125.0;
-          float fireLife = (yFire + 125.0) / 250.0; // 0 to 1
+          float fireLife = (yFire + 125.0) / 250.0;
           vFireLife = fireLife;
-          
           float fireSway = sin(uTime * 2.0 + yFire * 0.04 + aRandom.x * 5.0) * (20.0 * fireLife);
           vec3 firePos = vec3(pos.x * (0.4 + fireLife * 0.6) + fireSway, yFire, pos.z * 0.5);
           firePos.y += uAudio * 30.0 * fireLife;
@@ -151,29 +163,75 @@ export class ParticleEngine {
           float yRain = 125.0 - mod(uTime * fallSpeed + aRandom.x * 1000.0, 250.0);
           vec3 rainPos = vec3(pos.x + sin(uTime * 0.5) * 10.0, yRain, pos.z);
 
-          vec3 finalPos = kineticPos * mK + galaxyPos * mG + firePos * mF + rainPos * mR;
+          // --- VORTEX ---
+          float vX = pos.x * (0.8 + 0.2 * sin(uTime + aRandom.x * 6.28));
+          float vY = pos.y;
+          float vZ = pos.z;
+          float vSpiral = uTime * 3.0 + (vY * 0.05) + aRandom.x * 6.28;
+          vec2 vRot = rotate(vec2(vX, vZ), vSpiral);
+          vec3 vortexPos = vec3(vRot.x, vY, vRot.y);
 
-          // --- HAND INFLUENCE ---
-          vec2 handWorld = (uHand - 0.5) * vec2(350.0 * uAspect, 220.0);
-          vec2 delta = handWorld - finalPos.xy;
-          float dist = length(delta);
-          float pull = smoothstep(120.0, 0.0, dist);
+          // --- SPECTRUM ---
+          float sAngle = aRandom.x * 6.28;
+          float sRadius = 40.0 + uAudio * 60.0 * aRandom.y;
+          vec3 spectrumPos = vec3(cos(sAngle) * sRadius, sin(sAngle) * sRadius, (aRandom.y - 0.5) * 20.0);
+          spectrumPos.x += sin(uTime + sAngle) * 5.0;
+
+          vec3 finalPos = kineticPos * mK + galaxyPos * mG + firePos * mF + rainPos * mR + vortexPos * mV + spectrumPos * mS;
+
+          // --- HAND INFLUENCE (BOTH HANDS) ---
+          vec2 world1 = (uHand - 0.5) * vec2(350.0 * uAspect, 220.0);
+          vec2 world2 = (uHand2 - 0.5) * vec2(350.0 * uAspect, 220.0);
           
+          vec2 delta1 = world1 - finalPos.xy;
+          vec2 delta2 = world2 - finalPos.xy;
+          float dist1 = length(delta1);
+          float dist2 = length(delta2);
+          
+          float pull1 = smoothstep(120.0, 0.0, dist1);
+          float pull2 = smoothstep(120.0, 0.0, dist2);
+          float pull = max(pull1, pull2);
+          
+          // Interactions based on mode
           float isGalaxy = step(0.5, mG);
           float isFire = vIsFire;
           float isRain = step(0.5, mR);
           float isKinetic = step(0.5, mK);
+          float isVortex = step(0.5, mV);
+          float isSpectrum = step(0.5, mS);
 
-          finalPos.xy += delta * pull * 0.12 * isKinetic * (1.0 - uFist * 0.5);
-          finalPos.xy += normalize(delta + 0.001) * pull * (1.5 + uAudio * 2.0) * isGalaxy;
-          finalPos.xy -= normalize(delta + 0.001) * pull * 2.0 * isFire;
+          // Hand 1
+          finalPos.xy += delta1 * pull1 * 0.12 * isKinetic * (1.0 - uFist * 0.5);
+          finalPos.xy += normalize(delta1 + 0.001) * pull1 * (1.5 + uAudio * 2.0) * isGalaxy;
+          finalPos.xy -= normalize(delta1 + 0.001) * pull1 * 2.0 * isFire;
           
-          float rainBounce = step(dist, 40.0) * step(handWorld.y, finalPos.y);
-          finalPos.xy -= normalize(delta + 0.001) * (40.0 - dist) * 0.5 * rainBounce * isRain;
-          finalPos.y += 2.0 * rainBounce * isRain;
+          // Hand 2
+          finalPos.xy += delta2 * pull2 * 0.12 * isKinetic * (1.0 - uFist * 0.5);
+          finalPos.xy += normalize(delta2 + 0.001) * pull2 * (1.5 + uAudio * 2.0) * isGalaxy;
+          finalPos.xy -= normalize(delta2 + 0.001) * pull2 * 2.0 * isFire;
+
+          // Rain bounce
+          float rb1 = step(dist1, 40.0) * step(world1.y, finalPos.y);
+          float rb2 = step(dist2, 40.0) * step(world2.y, finalPos.y);
+          finalPos.xy -= normalize(delta1 + 0.001) * (40.0 - dist1) * 0.5 * rb1 * isRain;
+          finalPos.xy -= normalize(delta2 + 0.001) * (40.0 - dist2) * 0.5 * rb2 * isRain;
+          finalPos.y += 2.0 * (rb1 + rb2) * isRain;
+          
+          // Vortex attraction
+          finalPos.xy += normalize(delta1 + 0.001) * pull1 * 5.0 * isVortex;
+          finalPos.xy += normalize(delta2 + 0.001) * pull2 * 5.0 * isVortex;
+          
+          // Spectrum following hands
+          finalPos.xy += delta1 * pull1 * 0.8 * isSpectrum;
+          finalPos.xy += delta2 * pull2 * 0.8 * isSpectrum;
+
+          // Energy Charge (Energy pulls everything in)
+          float energyPull = uEnergy * pull * 15.0;
+          finalPos.xy += normalize(delta1 + 0.001) * energyPull * pull1;
+          finalPos.xy += normalize(delta2 + 0.001) * energyPull * pull2;
 
           // Fist & Explosion
-          finalPos.xy -= normalize(delta + 0.001) * pull * uFist * 12.0;
+          finalPos.xy -= (normalize(delta1 + 0.001) * pull1 + normalize(delta2 + 0.001) * pull2) * uFist * 12.0;
           
           vec2 toCenter = finalPos.xy;
           finalPos.xy += normalize(toCenter + 0.001) * uExplosion * 80.0 * (1.0 + aRandom.x);
@@ -184,12 +242,14 @@ export class ParticleEngine {
           float fireSize = mix(12.0, 2.0, fireLife);
           float baseSize = mix(8.0, 5.0, isGalaxy);
           baseSize = mix(baseSize, fireSize, isFire);
-          baseSize += uExplosion * 4.0 + uAudio * 6.0;
+          baseSize = mix(baseSize, 4.0, isVortex);
+          baseSize = mix(baseSize, 7.0, isSpectrum);
+          baseSize += uExplosion * 4.0 + uAudio * 6.0 + uEnergy * 8.0;
           
           gl_PointSize = max(2.0, baseSize * (100.0 / -mv.z));
           gl_Position = projectionMatrix * mv;
 
-          vAlpha = (0.6 + pull * 0.4 + uExplosion * 0.3 + uAudio * 0.2) * mix(1.0, 1.0 - fireLife, isFire);
+          vAlpha = (0.6 + pull * 0.4 + uExplosion * 0.3 + uAudio * 0.2 + uEnergy * 0.5) * mix(1.0, 1.0 - fireLife, isFire);
           vExplosion = uExplosion;
           vAudio = uAudio;
         }
@@ -204,11 +264,13 @@ export class ParticleEngine {
         uniform float uExplosion;
         uniform float uMode;
         uniform float uAudio;
+        uniform float uEnergy;
         varying float vAlpha;
         varying float vExplosion;
         varying float vAudio;
         varying float vFireLife;
         varying float vIsFire;
+        varying float vEnergy;
 
         void main() {
           float d = length(gl_PointCoord - 0.5);
@@ -217,7 +279,7 @@ export class ParticleEngine {
           float glow = pow(1.0 - d * 2.0, 1.2);
           
           // Rain mode: sharper drops
-          if (uMode > 2.5) {
+          if (uMode > 2.5 && uMode < 3.5) {
              glow = pow(1.0 - d * 2.0, 0.5); 
           }
           
@@ -226,13 +288,15 @@ export class ParticleEngine {
           vec3 baseColor = mix(c1, c2, uBlend);
           
           // --- FIRE COLOR LOGIC (Vibrant Flames) ---
-          // White-Yellow core (bottom) -> Orange -> Red -> Dark Ember (top)
           vec3 fireColor = mix(vec3(1.2, 1.1, 0.6), vec3(1.0, 0.5, 0.0), smoothstep(0.0, 0.3, vFireLife));
           fireColor = mix(fireColor, vec3(1.0, 0.2, 0.0), smoothstep(0.3, 0.7, vFireLife));
           fireColor = mix(fireColor, vec3(0.4, 0.05, 0.0), smoothstep(0.7, 1.0, vFireLife));
           
           vec3 color = mix(baseColor, fireColor, vIsFire);
           
+          // Energy color (Electric White/Blue)
+          color = mix(color, vec3(0.8, 0.9, 1.0), vEnergy * glow);
+
           color *= (1.3 + vAudio * 0.5);
           color += vec3(0.25, 0.12, 0.0) * uFist * glow;
           color = mix(color, vec3(1.0, 0.3, 0.1), vExplosion * 0.85);
@@ -261,26 +325,29 @@ export class ParticleEngine {
         this.time += dt;
         this.material.uniforms.uTime.value = this.time;
 
-        // Smooth hand
+        // Audio Reactivity
+        this.material.uniforms.uAudio.value = state.audioIntensity;
+
+        // Energy level
+        this.material.uniforms.uEnergy.value = state.energyLevel;
+
+        // Smooth hand 1
         this.smoothX += (state.handX - this.smoothX) * 0.15;
         this.smoothY += (state.handY - this.smoothY) * 0.15;
         this.material.uniforms.uHand.value.set(this.smoothX, 1 - this.smoothY);
 
-        // Smooth fist
-        this.smoothFist += ((state.isFist ? 1 : 0) - this.smoothFist) * 0.12;
-        this.material.uniforms.uFist.value = this.smoothFist;
-
-        // Explosion
-        this.material.uniforms.uExplosion.value = state.explosionStrength;
-
-        // Audio Reactivity
-        this.material.uniforms.uAudio.value = state.audioIntensity;
+        // Smooth hand 2
+        this.smooth2X += (state.hand2X - this.smooth2X) * 0.15;
+        this.smooth2Y += (state.hand2Y - this.smooth2Y) * 0.15;
+        this.material.uniforms.uHand2.value.set(this.smooth2X, 1 - this.smooth2Y);
 
         // Mode Interpolation
         switch (state.visualMode) {
             case 'galaxy': this.targetModeValue = 1.0; break;
             case 'fire': this.targetModeValue = 2.0; break;
             case 'rain': this.targetModeValue = 3.0; break;
+            case 'vortex': this.targetModeValue = 4.0; break;
+            case 'spectrum': this.targetModeValue = 5.0; break;
             default: this.targetModeValue = 0.0; break; // kinetic
         }
 
