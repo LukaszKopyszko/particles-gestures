@@ -1,3 +1,11 @@
+/**
+ * META
+ * @file: src/state/useInputStore.ts
+ * @role: store (zustand)
+ * @does: Manages global reactive state (hand position, gesture type, fps, colors).
+ * @depends_on: zustand
+ * @used_by: HUD.tsx, SceneRoot.tsx
+ */
 import { create } from 'zustand';
 
 export interface HandData {

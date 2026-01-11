@@ -1,3 +1,11 @@
+/**
+ * META
+ * @file: src/components/CameraPreviewOverlay.tsx
+ * @role: component
+ * @does: Initializes camera stream and displays visual preview.
+ * @depends_on: Navigator.mediaDevices
+ * @used_by: SceneRoot.tsx
+ */
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';

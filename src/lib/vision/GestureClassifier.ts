@@ -1,3 +1,11 @@
+/**
+ * META
+ * @file: src/lib/vision/GestureClassifier.ts
+ * @role: service
+ * @does: Analyzes hand landmarks geometry to detect gestures (Fist, OK, ThumbsUp, etc.)
+ * @depends_on: MediaPipe HandLandmarker results
+ * @used_by: SceneRoot.tsx (HandTrackerService callback)
+ */
 export enum GestureType {
     NONE = 'none',
     OPEN = 'open',

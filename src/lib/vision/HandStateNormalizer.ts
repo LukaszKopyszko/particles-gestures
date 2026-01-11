@@ -1,3 +1,11 @@
+/**
+ * META
+ * @file: src/lib/vision/HandStateNormalizer.ts
+ * @role: util
+ * @does: Normalizes raw MediaPipe landmarks to smoothed screen coordinates (x, y) and velocity.
+ * @depends_on: None (pure logic)
+ * @used_by: SceneRoot.tsx
+ */
 export interface NormalizedHandState {
     x: number;
     y: number;

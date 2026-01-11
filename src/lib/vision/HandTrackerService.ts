@@ -1,3 +1,11 @@
+/**
+ * META
+ * @file: src/lib/vision/HandTrackerService.ts
+ * @role: service
+ * @does: Handles camera initialization and MediaPipe HandLandmarker stream processing.
+ * @depends_on: @mediapipe/tasks-vision
+ * @used_by: SceneRoot.tsx
+ */
 import { FilesetResolver, HandLandmarker, HandLandmarkerResult } from "@mediapipe/tasks-vision";
 
 export type HandLandmarkerCallback = (result: HandLandmarkerResult) => void;

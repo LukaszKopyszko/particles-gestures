@@ -1,3 +1,11 @@
+/**
+ * META
+ * @file: src/components/SceneRoot.tsx
+ * @role: component (orchestrator)
+ * @does: Main application logic. Connects Vision (HandTracker), State (Zustand), and Scene (ParticleEngine).
+ * @depends_on: ParticleEngine, HandTrackerService, GestureClassifier, HUD
+ * @used_by: app/page.tsx
+ */
 'use client';
 
 import React, { useEffect, useRef, useCallback } from 'react';
@@ -6,6 +14,7 @@ import { HandTrackerService } from '@/lib/vision/HandTrackerService';
 import { HandStateNormalizer } from '@/lib/vision/HandStateNormalizer';
 import { GestureClassifier, GestureType } from '@/lib/vision/GestureClassifier';
 import { CameraPreviewOverlay } from './CameraPreviewOverlay';
+import { IntroOverlay } from './IntroOverlay';
 import { HUD } from './HUD';
 import { useInputStore, COLOR_NAMES } from '@/state/useInputStore';
 
@@ -13,6 +22,7 @@ export default function SceneRoot() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const engineRef = useRef<ParticleEngine | null>(null);
     const trackerRef = useRef<HandTrackerService | null>(null);
+    const [hasStarted, setHasStarted] = React.useState(false);
 
     const inputStateRef = useRef<ParticleSystemState>({
         handX: 0.5,
@@ -96,6 +106,8 @@ export default function SceneRoot() {
 
     useEffect(() => {
         if (!canvasRef.current) return;
+        // Engine initializes regardless, but maybe we want to pause it? 
+        // For now let's let it run idle in background, it looks cool.
 
         const engine = new ParticleEngine(canvasRef.current);
         engineRef.current = engine;
@@ -166,8 +178,15 @@ export default function SceneRoot() {
                     display: 'block'
                 }}
             />
-            <CameraPreviewOverlay onVideoReady={handleVideoReady} />
-            <HUD />
+
+            {!hasStarted && <IntroOverlay onStart={() => setHasStarted(true)} />}
+
+            {hasStarted && (
+                <>
+                    <CameraPreviewOverlay onVideoReady={handleVideoReady} />
+                    <HUD />
+                </>
+            )}
         </div>
     );
 }

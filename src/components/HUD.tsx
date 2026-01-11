@@ -1,3 +1,11 @@
+/**
+ * META
+ * @file: src/components/HUD.tsx
+ * @role: component
+ * @does: Displays UI overlay with FPS, gesture feedback, and legend.
+ * @depends_on: useInputStore
+ * @used_by: SceneRoot.tsx
+ */
 'use client';
 
 import React, { useEffect, useState } from 'react';

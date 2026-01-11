@@ -1,3 +1,11 @@
+/**
+ * META
+ * @file: src/lib/input/TouchGestureAdapter.ts
+ * @role: adapter (fallback)
+ * @does: Handles touch gestures via Hammer.js for devices without camera.
+ * @depends_on: hammerjs
+ * @used_by: (Currently unused / Pending integration)
+ */
 import Hammer from 'hammerjs';
 
 export class TouchGestureAdapter {

@@ -1,3 +1,11 @@
+/**
+ * META
+ * @file: src/lib/scene/ParticleEngine.ts
+ * @role: service (rendering engine)
+ * @does: Manages Three.js scene, camera, and custom shader particles system.
+ * @depends_on: Three.js
+ * @used_by: SceneRoot.tsx
+ */
 import * as THREE from 'three';
 
 export interface ParticleSystemState {
