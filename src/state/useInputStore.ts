@@ -1,23 +1,27 @@
 /**
  * META
  * @file: src/state/useInputStore.ts
- * @role: store (zustand)
- * @does: Manages global reactive state (hand position, gesture type, fps, colors).
+ * @role: state-management
+ * @does: Manages global application state for hand tracking, gestures, and visual modes using Zustand.
  * @depends_on: zustand
- * @used_by: HUD.tsx, SceneRoot.tsx
+ * @used_by: SceneRoot.tsx, HUD.tsx, ParticleEngine.ts
  */
 import { create } from 'zustand';
+
+export type VisualMode = 'kinetic' | 'galaxy' | 'fire' | 'rain' | 'vortex' | 'spectrum';
+export type HandType = 'Left' | 'Right' | 'Unknown';
 
 export interface HandData {
     x: number;
     y: number;
     isDetected: boolean;
+    handedness: HandType;
 }
 
 export type GestureType = 'none' | 'open' | 'fist' | 'pointing' | 'peace' | 'middle' | 'thumbsup' | 'ok';
-export type VisualMode = 'kinetic' | 'galaxy' | 'fire' | 'rain' | 'vortex' | 'spectrum';
 
 interface InputState {
+    // State
     hand: HandData;
     hand2: HandData;
     gesture: GestureType;
@@ -30,9 +34,12 @@ interface InputState {
     showMiddleMessage: boolean;
     showThumbsUp: boolean;
     explosionTrigger: number;
-    energyLevel: number; // 0.0 - 1.0 for "charging" effect
+    energyLevel: number;
+    isAudioReactive: boolean;
+    modeChangeMessage: string;
 
-    updateHand: (x: number, y: number, isDetected: boolean, handIndex?: number) => void;
+    // Actions
+    updateHand: (x: number, y: number, isDetected: boolean, handedness: HandType, handIndex?: number) => void;
     setGesture: (gesture: GestureType, confidence: number, handIndex?: number) => void;
     setFps: (fps: number) => void;
     setColor: (index: number, name: string) => void;
@@ -42,13 +49,15 @@ interface InputState {
     hideThumbsUp: () => void;
     setVisualMode: (mode: VisualMode) => void;
     setEnergyLevel: (level: number) => void;
+    toggleAudioReactivity: () => void;
+    setModeMessage: (msg: string) => void;
 }
 
 const COLOR_NAMES = ['Cyan', 'Ember', 'Lime', 'Violet', 'Gold'];
 
 export const useInputStore = create<InputState>((set) => ({
-    hand: { x: 0.5, y: 0.5, isDetected: false },
-    hand2: { x: 0.5, y: 0.5, isDetected: false },
+    hand: { x: 0.5, y: 0.5, isDetected: false, handedness: 'Unknown' },
+    hand2: { x: 0.5, y: 0.5, isDetected: false, handedness: 'Unknown' },
     gesture: 'none',
     gesture2: 'none',
     gestureConfidence: 0,
@@ -60,10 +69,12 @@ export const useInputStore = create<InputState>((set) => ({
     showThumbsUp: false,
     explosionTrigger: 0,
     energyLevel: 0,
+    isAudioReactive: true,
+    modeChangeMessage: '',
 
-    updateHand: (x, y, isDetected, handIndex = 0) => set((state) => ({
-        hand: handIndex === 0 ? { x, y, isDetected } : state.hand,
-        hand2: handIndex === 1 ? { x, y, isDetected } : state.hand2,
+    updateHand: (x, y, isDetected, handedness, handIndex = 0) => set((state) => ({
+        hand: handIndex === 0 ? { x, y, isDetected, handedness } : state.hand,
+        hand2: handIndex === 1 ? { x, y, isDetected, handedness } : state.hand2,
     })),
     setGesture: (gesture, confidence, handIndex = 0) => set((state) => ({
         gesture: handIndex === 0 ? gesture : state.gesture,
@@ -72,18 +83,14 @@ export const useInputStore = create<InputState>((set) => ({
     })),
     setFps: (fps) => set({ fps }),
     setColor: (index, name) => set({ colorIndex: index, colorName: name }),
-
-    triggerMiddleFinger: () => set((state) => ({
-        showMiddleMessage: true,
-        explosionTrigger: state.explosionTrigger + 1
-    })),
+    triggerMiddleFinger: () => set({ showMiddleMessage: true }),
     hideMiddleMessage: () => set({ showMiddleMessage: false }),
-
     triggerThumbsUp: () => set({ showThumbsUp: true }),
     hideThumbsUp: () => set({ showThumbsUp: false }),
-
     setVisualMode: (mode) => set({ visualMode: mode }),
-    setEnergyLevel: (level) => set({ energyLevel: level })
+    setEnergyLevel: (level) => set({ energyLevel: level }),
+    toggleAudioReactivity: () => set((state) => ({ isAudioReactive: !state.isAudioReactive })),
+    setModeMessage: (msg) => set({ modeChangeMessage: msg })
 }));
 
 export { COLOR_NAMES };

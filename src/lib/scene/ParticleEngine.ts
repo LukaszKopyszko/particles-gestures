@@ -23,6 +23,7 @@ export interface ParticleSystemState {
     visualMode: 'kinetic' | 'galaxy' | 'fire' | 'rain' | 'vortex' | 'spectrum';
     audioIntensity: number; // 0.0 - 1.0 from FFT
     energyLevel: number;
+    isAudioReactive: boolean;
 }
 
 const PALETTES = [
@@ -91,6 +92,7 @@ export class ParticleEngine {
                 uFist: { value: 0 },
                 uExplosion: { value: 0 },
                 uEnergy: { value: 0 },
+                uAudioReactive: { value: 1.0 },
                 uMode: { value: 0 }, // 0=K, 1=G, 2=F, 3=R, 4=V, 5=S
                 uColor1: { value: new THREE.Color(PALETTES[0][0]) },
                 uColor2: { value: new THREE.Color(PALETTES[0][1]) },
@@ -105,9 +107,10 @@ export class ParticleEngine {
         uniform vec2 uHand;
         uniform vec2 uHand2;
         uniform float uFist;
-        uniform float uExplosion;
-        uniform float uEnergy;
-        uniform float uMode;
+          uniform float uExplosion;
+          uniform float uEnergy;
+          uniform float uAudioReactive;
+          uniform float uMode;
         uniform float uAudio;
         uniform float uAspect;
         attribute vec2 aRandom;
@@ -133,6 +136,8 @@ export class ParticleEngine {
           float mS = clamp(uMode - 4.0, 0.0, 1.0); // Spectrum
           float mK = clamp(1.0 - uMode, 0.0, 1.0);
           
+          float audioIntensity = uAudio * uAudioReactive;
+          
           vIsFire = step(0.5, mF);
           vEnergy = uEnergy;
 
@@ -147,7 +152,7 @@ export class ParticleEngine {
           float spiralAngle = uTime * 0.2 + (500.0 / (distCenter + 10.0)) + aRandom.x * 6.0;
           vec2 rotGalaxy = rotate(pos.xy, spiralAngle * 0.5);
           vec3 galaxyPos = vec3(rotGalaxy, sin(spiralAngle) * 3.0);
-          galaxyPos.xy *= (1.0 + uAudio * 0.15);
+          galaxyPos.xy *= (1.0 + audioIntensity * 0.15);
 
           // --- FIRE ---
           float riseSpeed = 40.0 + aRandom.y * 30.0;
@@ -156,7 +161,7 @@ export class ParticleEngine {
           vFireLife = fireLife;
           float fireSway = sin(uTime * 2.0 + yFire * 0.04 + aRandom.x * 5.0) * (20.0 * fireLife);
           vec3 firePos = vec3(pos.x * (0.4 + fireLife * 0.6) + fireSway, yFire, pos.z * 0.5);
-          firePos.y += uAudio * 30.0 * fireLife;
+          firePos.y += audioIntensity * 30.0 * fireLife;
 
           // --- RAIN ---
           float fallSpeed = 50.0 + aRandom.y * 40.0;
@@ -173,7 +178,7 @@ export class ParticleEngine {
 
           // --- SPECTRUM ---
           float sAngle = aRandom.x * 6.28;
-          float sRadius = 40.0 + uAudio * 60.0 * aRandom.y;
+          float sRadius = 40.0 + audioIntensity * 60.0 * aRandom.y;
           vec3 spectrumPos = vec3(cos(sAngle) * sRadius, sin(sAngle) * sRadius, (aRandom.y - 0.5) * 20.0);
           spectrumPos.x += sin(uTime + sAngle) * 5.0;
 
@@ -244,7 +249,7 @@ export class ParticleEngine {
           baseSize = mix(baseSize, fireSize, isFire);
           baseSize = mix(baseSize, 4.0, isVortex);
           baseSize = mix(baseSize, 7.0, isSpectrum);
-          baseSize += uExplosion * 4.0 + uAudio * 6.0 + uEnergy * 8.0;
+          baseSize += uExplosion * 4.0 + audioIntensity * 6.0 + uEnergy * 8.0;
           
           gl_PointSize = max(2.0, baseSize * (100.0 / -mv.z));
           gl_Position = projectionMatrix * mv;
@@ -335,6 +340,9 @@ export class ParticleEngine {
         this.smoothX += (state.handX - this.smoothX) * 0.15;
         this.smoothY += (state.handY - this.smoothY) * 0.15;
         this.material.uniforms.uHand.value.set(this.smoothX, 1 - this.smoothY);
+
+        // Audio Reactive State
+        this.material.uniforms.uAudioReactive.value = state.isAudioReactive ? 1.0 : 0.0;
 
         // Smooth hand 2
         this.smooth2X += (state.hand2X - this.smooth2X) * 0.15;

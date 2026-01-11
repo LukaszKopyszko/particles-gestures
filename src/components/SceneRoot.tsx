@@ -40,7 +40,8 @@ export default function SceneRoot() {
         explosionStrength: 0,
         visualMode: 'kinetic',
         audioIntensity: 0,
-        energyLevel: 0
+        energyLevel: 0,
+        isAudioReactive: true
     });
 
     // We use selectors to only re-render when a specific value changes
@@ -92,65 +93,91 @@ export default function SceneRoot() {
         await tracker.start(video, (result) => {
             const handsToProcess = result.landmarks.length;
 
-            // Update Store and Shaders for 2 hands
-            for (let i = 0; i < 2; i++) {
-                if (i < handsToProcess) {
-                    const landmarks = result.landmarks[i];
-                    const norm = i === 0 ? normalizer.current : normalizer2.current;
-                    const classif = i === 0 ? classifier.current : classifier2.current;
+            // Clear detection for both indices initially
+            // Note: MediaPipe might swap hand indices i=0/1 between frames, 
+            // so we rely on result.handedness for role consistency.
+            let rightHandIdx = -1;
+            let leftHandIdx = -1;
 
-                    const pos = norm.process(landmarks);
-                    const gestureResult = classif.process(landmarks);
+            if (handsToProcess > 0) {
+                result.handedness.forEach((h, idx) => {
+                    if (h[0].categoryName === 'Right') rightHandIdx = idx;
+                    if (h[0].categoryName === 'Left') leftHandIdx = idx;
+                });
+            }
 
-                    if (i === 0) {
-                        inputStateRef.current.handX = pos.x;
-                        inputStateRef.current.handY = pos.y;
-                        inputStateRef.current.handVx = pos.vx;
-                        inputStateRef.current.handVy = pos.vy;
-                        inputStateRef.current.isFist = gestureResult.gesture === GestureType.FIST;
-                        inputStateRef.current.isMiddle = gestureResult.gesture === GestureType.MIDDLE;
-                    } else {
-                        inputStateRef.current.hand2X = pos.x;
-                        inputStateRef.current.hand2Y = pos.y;
+            // Process Right Hand (The Sculptor - Interaction)
+            if (rightHandIdx !== -1) {
+                const landmarks = result.landmarks[rightHandIdx];
+                const pos = normalizer.current.process(landmarks);
+                const gestureResult = classifier.current.process(landmarks);
+
+                inputStateRef.current.handX = pos.x;
+                inputStateRef.current.handY = pos.y;
+                inputStateRef.current.handVx = pos.vx;
+                inputStateRef.current.handVy = pos.vy;
+                inputStateRef.current.isFist = gestureResult.gesture === GestureType.FIST;
+
+                updateHand(pos.x, pos.y, true, 'Right', 0);
+                setGesture(gestureResult.gesture as any, gestureResult.confidence, 0);
+            } else {
+                updateHand(0.5, 0.5, false, 'Unknown', 0);
+                setGesture('none', 0, 0);
+                inputStateRef.current.isFist = false;
+            }
+
+            // Process Left Hand (The Architect - System)
+            if (leftHandIdx !== -1) {
+                const landmarks = result.landmarks[leftHandIdx];
+                const pos = normalizer2.current.process(landmarks);
+                const gestureResult = classifier2.current.process(landmarks);
+
+                inputStateRef.current.hand2X = pos.x;
+                inputStateRef.current.hand2Y = pos.y;
+
+                if (gestureResult.changed) {
+                    // Left Hand Colors: Pointing
+                    if (gestureResult.gesture === GestureType.POINTING) {
+                        inputStateRef.current.colorPaletteIndex += 1;
+                        const idx = inputStateRef.current.colorPaletteIndex % COLOR_NAMES.length;
+                        const name = COLOR_NAMES[idx];
+                        setColor(idx, name);
+                        useInputStore.getState().setModeMessage(`PALETTE: ${name}`);
+                        audioRef.current?.playSweep();
                     }
 
-                    if (gestureResult.changed) {
-                        // Color Change: Pointing
-                        if (gestureResult.gesture === GestureType.POINTING) {
-                            inputStateRef.current.colorPaletteIndex += 1;
-                            const idx = inputStateRef.current.colorPaletteIndex % COLOR_NAMES.length;
-                            setColor(idx, COLOR_NAMES[idx]);
-                            audioRef.current?.playSweep();
-                        }
-
-                        // Mode shortcuts
-                        if (gestureResult.gesture === GestureType.OPEN) setVisualMode('kinetic');
-                        if (gestureResult.gesture === GestureType.OK) setVisualMode('galaxy');
-                        if (gestureResult.gesture === GestureType.PEACE) setVisualMode('rain');
-                        if (gestureResult.gesture === GestureType.THUMBSUP) setVisualMode('spectrum');
-
-                        if (gestureResult.gesture === GestureType.MIDDLE) triggerMiddleFinger();
-                        if (gestureResult.gesture === GestureType.THUMBSUP) triggerThumbsUp();
+                    // Left Hand Modes
+                    if (gestureResult.gesture === GestureType.OPEN) {
+                        setVisualMode('kinetic');
+                        useInputStore.getState().setModeMessage('MODE: KINETIC');
                     }
-
-                    // Fist charging logic moved to the main loop based on current store state
-                    // but we still need to track if it's currently a fist
-                    if (i === 0) {
-                        inputStateRef.current.isFist = gestureResult.gesture === GestureType.FIST;
+                    if (gestureResult.gesture === GestureType.OK) {
+                        useInputStore.getState().toggleAudioReactivity();
+                        const isReact = useInputStore.getState().isAudioReactive;
+                        useInputStore.getState().setModeMessage(isReact ? 'AUDIO SOURCE: ON' : 'AUDIO SOURCE: OFF');
                     }
-
-
-                    updateHand(pos.x, pos.y, true, i);
-                    setGesture(gestureResult.gesture as any, gestureResult.confidence, i);
-                } else {
-                    // Hand not detected
-                    updateHand(0.5, 0.5, false, i);
-                    setGesture('none', 0, i);
-                    if (i === 1) {
-                        inputStateRef.current.hand2X = 0.5;
-                        inputStateRef.current.hand2Y = 0.5;
+                    if (gestureResult.gesture === GestureType.PEACE) {
+                        setVisualMode('rain');
+                        useInputStore.getState().setModeMessage('MODE: RAIN');
+                    }
+                    if (gestureResult.gesture === GestureType.THUMBSUP) {
+                        setVisualMode('spectrum');
+                        useInputStore.getState().setModeMessage('MODE: SPECTRUM');
+                    }
+                    // Adding Vortex shortcut
+                    if (gestureResult.gesture === GestureType.MIDDLE) {
+                        setVisualMode('vortex');
+                        useInputStore.getState().setModeMessage('MODE: VORTEX');
                     }
                 }
+
+                updateHand(pos.x, pos.y, true, 'Left', 1);
+                setGesture(gestureResult.gesture as any, gestureResult.confidence, 1);
+            } else {
+                updateHand(0.5, 0.5, false, 'Unknown', 1);
+                setGesture('none', 0, 1);
+                inputStateRef.current.hand2X = 0.5;
+                inputStateRef.current.hand2Y = 0.5;
             }
         });
 
@@ -199,6 +226,9 @@ export default function SceneRoot() {
                 const analysis = audioRef.current.getAnalysis();
                 inputStateRef.current.audioIntensity = analysis.overall;
             }
+
+            inputStateRef.current.isAudioReactive = useInputStore.getState().isAudioReactive;
+
 
             if (inputStateRef.current.explosionStrength > 0) {
                 inputStateRef.current.explosionStrength -= dt * 1.5;
