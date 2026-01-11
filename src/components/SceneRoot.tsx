@@ -37,6 +37,7 @@ export default function SceneRoot() {
         visualMode: 'kinetic'
     });
 
+    // We use selectors to only re-render when a specific value changes
     const updateHand = useInputStore((s) => s.updateHand);
     const setGesture = useInputStore((s) => s.setGesture);
     const setFps = useInputStore((s) => s.setFps);
@@ -45,6 +46,9 @@ export default function SceneRoot() {
     const triggerThumbsUp = useInputStore((s) => s.triggerThumbsUp);
     const explosionTrigger = useInputStore((s) => s.explosionTrigger);
     const visualMode = useInputStore((s) => s.visualMode);
+
+    // Note: We DON'T select 'hand' here because we don't need it to trigger re-renders in SceneRoot.
+    // The engine loop reads from inputStateRef.current which we update manually.
 
     // Sync visual mode to ref
     useEffect(() => {

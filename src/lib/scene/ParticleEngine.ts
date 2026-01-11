@@ -58,8 +58,10 @@ export class ParticleEngine {
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         this.renderer.setClearColor(0x050510);
 
-        // Increased count for Galaxy mode
-        const count = 8000;
+        // Detect mobile to optimize particle count
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const count = isMobile ? 3500 : 8000;
+
         const positions = new Float32Array(count * 3);
         const randoms = new Float32Array(count * 2);
 
@@ -94,127 +96,82 @@ export class ParticleEngine {
         uniform vec2 uHand;
         uniform float uFist;
         uniform float uExplosion;
-        uniform float uMode; // Interpolated mode value
+        uniform float uMode;
         uniform float uAspect;
         attribute vec2 aRandom;
         varying float vAlpha;
         varying float vExplosion;
         
-        // Helper for rotation
         vec2 rotate(vec2 v, float a) {
-            float s = sin(a);
-            float c = cos(a);
+            float s = sin(a); float c = cos(a);
             return mat2(c, -s, s, c) * v;
         }
 
         void main() {
           vec3 pos = position;
-          vec3 originalPos = position;
           
-          // --- MODE 0: KINETIC (Flow) ---
+          // --- KINETIC ---
           vec3 kineticPos = pos;
           kineticPos.x += sin(uTime * 0.2 + aRandom.x * 6.28) * 4.0;
           kineticPos.y += cos(uTime * 0.15 + aRandom.y * 6.28) * 3.0;
           kineticPos.z += sin(uTime * 0.1 + pos.x * 0.01) * 2.0;
 
-          // --- MODE 1: GALAXY (Spiral) ---
-          vec3 galaxyPos = pos;
-          float distCenter = length(galaxyPos.xy);
+          // --- GALAXY ---
+          float distCenter = length(pos.xy);
           float spiralAngle = uTime * 0.2 + (500.0 / (distCenter + 10.0)) + aRandom.x * 6.0;
-          galaxyPos.xy = rotate(originalPos.xy, spiralAngle * 0.5);
-          galaxyPos.z += sin(spiralAngle) * 10.0;
-          // Flatten galaxy
-          galaxyPos.z *= 0.3;
+          vec2 rotGalaxy = rotate(pos.xy, spiralAngle * 0.5);
+          vec3 galaxyPos = vec3(rotGalaxy, sin(spiralAngle) * 3.0);
 
-          // --- MODE 2: FIRE (Upward turbulent) ---
-          vec3 firePos = pos;
+          // --- FIRE ---
           float riseSpeed = 30.0 + aRandom.y * 20.0;
-          float yOffset = mod(uTime * riseSpeed + aRandom.x * 1000.0, 250.0) - 125.0;
-          firePos.y = yOffset;
-          // Turbulent X sway
-          firePos.x += sin(uTime * 1.5 + firePos.y * 0.05) * 10.0;
-          firePos.x += sin(uTime * 3.0 + firePos.y * 0.1) * 4.0;
-          // Cone shape logic could go here but simple is fine
+          float yFire = mod(uTime * riseSpeed + aRandom.x * 1000.0, 250.0) - 125.0;
+          vec3 firePos = vec3(pos.x + sin(uTime * 1.5 + yFire * 0.05) * 10.0, yFire, pos.z);
 
-          // --- MODE 3: RAIN (Downward + bounce) ---
-          vec3 rainPos = pos;
+          // --- RAIN ---
           float fallSpeed = 50.0 + aRandom.y * 40.0;
           float yRain = 125.0 - mod(uTime * fallSpeed + aRandom.x * 1000.0, 250.0);
-          rainPos.y = yRain;
-          rainPos.x = originalPos.x; // Straight down lines? Maybe slight wind
-          rainPos.x += sin(uTime * 0.5) * 10.0; 
+          vec3 rainPos = vec3(pos.x + sin(uTime * 0.5) * 10.0, yRain, pos.z);
 
-          // --- MIXING MODES ---
-          // Since uMode is a float that can slide, we mix positions.
-          // Ideally we'd optimize this but for 4 modes a simple mix chain works.
-          vec3 finalPos = kineticPos;
-          
-          // Mix Kinetic -> Galaxy
-          float m1 = smoothstep(0.0, 1.0, uMode);
-          if (uMode > 0.0) finalPos = mix(finalPos, galaxyPos, m1);
-          
-          // Mix Galaxy -> Fire
-          float m2 = smoothstep(1.0, 2.0, uMode);
-          if (uMode > 1.0) finalPos = mix(finalPos, firePos, m2);
-          
-          // Mix Fire -> Rain
-          float m3 = smoothstep(2.0, 3.0, uMode);
-          if (uMode > 2.0) finalPos = mix(finalPos, rainPos, m3);
+          // --- BRANCHLESS MODE MAPPING ---
+          float mG = clamp(1.0 - abs(uMode - 1.0), 0.0, 1.0);
+          float mF = clamp(1.0 - abs(uMode - 2.0), 0.0, 1.0);
+          float mR = clamp(uMode - 2.0, 0.0, 1.0);
+          float mK = clamp(1.0 - uMode, 0.0, 1.0);
 
+          vec3 finalPos = kineticPos * mK + galaxyPos * mG + firePos * mF + rainPos * mR;
 
-          // --- HAND INTERACTION (Common) ---
+          // --- HAND INFLUENCE ---
           vec2 handWorld = (uHand - 0.5) * vec2(350.0 * uAspect, 220.0);
           vec2 delta = handWorld - finalPos.xy;
           float dist = length(delta);
-          
-          // Kinetic pull
           float pull = smoothstep(120.0, 0.0, dist);
           
-          // Galaxy: Gravity well
-          if (uMode > 0.5 && uMode < 1.5) {
-             // In galaxy mode, hand is a black hole
-             finalPos.xy += normalize(delta) * pull * 1.5; 
-          } 
-          // Fire: Repel (wind)
-          else if (uMode > 1.5 && uMode < 2.5) {
-             finalPos.xy -= normalize(delta) * pull * 2.0;
-          }
-          // Rain: Umbrella effect
-          else if (uMode > 2.5) {
-             if (dist < 40.0 && finalPos.y > handWorld.y) {
-                 // Bounce up/side
-                 finalPos.xy -= normalize(delta) * (40.0 - dist);
-                 finalPos.y += 2.0; 
-             }
-          }
-          else {
-             // Default Kinetic Attraction
-             finalPos.xy += delta * pull * 0.12 * (1.0 - uFist * 0.5);
-          }
+          // Influence based on mode (using steps instead of ifs)
+          float isGalaxy = step(0.5, mG);
+          float isFire = step(0.5, mF);
+          float isRain = step(0.5, mR);
+          float isKinetic = step(0.5, mK);
 
+          // Kinetic: Attraction
+          finalPos.xy += delta * pull * 0.12 * isKinetic * (1.0 - uFist * 0.5);
+          // Galaxy: Gravity
+          finalPos.xy += normalize(delta + 0.001) * pull * 1.5 * isGalaxy;
+          // Fire: Repel
+          finalPos.xy -= normalize(delta + 0.001) * pull * 2.0 * isFire;
+          // Rain: Umbrella
+          float rainBounce = step(dist, 40.0) * step(handWorld.y, finalPos.y);
+          finalPos.xy -= normalize(delta + 0.001) * (40.0 - dist) * 0.5 * rainBounce * isRain;
+          finalPos.y += 2.0 * rainBounce * isRain;
 
-          // --- FIST & EXPLOSION EFFECTS ---
-          // Fist ripple
-          if (uFist > 0.1) {
-             finalPos.xy -= normalize(delta + 0.001) * pull * uFist * 12.0;
-          }
+          // Fist & Explosion
+          finalPos.xy -= normalize(delta + 0.001) * pull * uFist * 12.0;
           
-          // Explosion
-          if (uExplosion > 0.01) {
-             vec2 toCenter = finalPos.xy;
-             vec2 expDir = normalize(toCenter + vec2(0.001));
-             finalPos.xy += expDir * uExplosion * 80.0 * (1.0 + aRandom.x);
-             finalPos.z += (aRandom.y - 0.5) * uExplosion * 40.0;
-          }
+          vec2 toCenter = finalPos.xy;
+          finalPos.xy += normalize(toCenter + 0.001) * uExplosion * 80.0 * (1.0 + aRandom.x);
+          finalPos.z += (aRandom.y - 0.5) * uExplosion * 40.0;
 
           vec4 mv = modelViewMatrix * vec4(finalPos, 1.0);
-          
-          float baseSize = 8.0 + uExplosion * 4.0;
-          
-          // Mode specific sizing?
-          if (uMode > 0.5 && uMode < 1.5) baseSize *= 0.6; // Smaller stars
-          if (uMode > 2.5) baseSize = 4.0 + aRandom.x * 2.0; // Rain drops
-          
+          float baseSize = mix(8.0, 5.0, isGalaxy) + uExplosion * 4.0;
           gl_PointSize = max(2.0, baseSize * (100.0 / -mv.z));
           gl_Position = projectionMatrix * mv;
 

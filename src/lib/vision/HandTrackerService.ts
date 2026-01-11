@@ -93,17 +93,28 @@ export class HandTrackerService {
         }
     }
 
+    private lastProcessedTime = 0;
+    private targetFPS = 25; // 25-30 FPS is plenty for smooth gestures
+
     private loop = (): void => {
         if (!this.running || !this.video) return;
 
+        const now = performance.now();
+        const elapsed = now - this.lastProcessedTime;
+
         if (this.handLandmarker) {
-            if (this.video.currentTime !== this.lastVideoTime && this.video.readyState >= 2) {
+            // Only process if enough time has passed AND video is ready
+            if (elapsed > (1000 / this.targetFPS) &&
+                this.video.currentTime !== this.lastVideoTime &&
+                this.video.readyState >= 2) {
+
                 this.lastVideoTime = this.video.currentTime;
+                this.lastProcessedTime = now;
+
                 try {
-                    const results = this.handLandmarker.detectForVideo(this.video, performance.now());
+                    const results = this.handLandmarker.detectForVideo(this.video, now);
                     if (this.callback) this.callback(results);
                 } catch (e) {
-                    // Sometimes MediaPipe errors if video logic is weird
                     console.warn("MediaPipe detect error:", e);
                 }
             }
