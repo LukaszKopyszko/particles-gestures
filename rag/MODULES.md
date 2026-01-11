@@ -68,6 +68,7 @@ Warstwa prezentacji i zarządzania stanem globalnym aplikacji.
 |------|------|
 | `useInputStore.ts` | Zustand store. Przechowuje: `hand` {x,y}, `gesture`, `fps`, `colorIndex`. |
 | `HUD.tsx` | Wyświetla nakładkę (overlay): FPS, aktualny gest, legendę, powiadomienia ("NICE!", "FUCK YOU!"). |
+| `IntroOverlay.tsx` | Ekran powitalny (Glassmorphism). Blokuje dostęp do kamery do momentu kliknięcia "Start". |
 | `CameraPreviewOverlay.tsx` | Mały podgląd video w lewym dolnym rogu. |
 
 ### Konwencje

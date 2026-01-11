@@ -53,6 +53,7 @@
 │   │
 │   ├── components/
 │   │   ├── SceneRoot.tsx       # Orkiestrator: Canvas + Vision + State
+│   │   ├── IntroOverlay.tsx    # Ekran powitalny (start/instrukcja)
 │   │   ├── CameraPreviewOverlay.tsx # Podgląd kamery + inicjalizacja
 │   │   └── HUD.tsx             # Overlay UI (FPS, gesty, legenda)
 │   │
